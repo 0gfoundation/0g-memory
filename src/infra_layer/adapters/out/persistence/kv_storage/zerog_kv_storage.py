@@ -28,8 +28,8 @@ import threading
 # Fixed encryption key derived from a hardcoded seed.
 # Deterministic across restarts so previously written data remains readable.
 # TODO: replace with a proper key from environment variable before production.
-_rng = random.Random(0x4576_724D_656D_4F53)  # seed = "EverMemOS" in hex
-_ENCRYPTION_KEY: bytes = bytes(_rng.getrandbits(8) for _ in range(32))
+_rng = random.Random(0x4576_724D_656D_4F53)
+_ENCRYPTION_KEY = bytes(_rng.getrandbits(8) for _ in range(32))
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple, AsyncIterator
 
