@@ -1,5 +1,5 @@
 #!/bin/bash
-# EverMemOS One-Command Installer
+# EverMemOS One-Time Installer
 #
 # Usage:
 #   ./install.sh              # interactive (recommended for first time)
@@ -10,7 +10,10 @@
 #   2. Starts Docker services (MongoDB, Elasticsearch, Milvus, Redis)
 #   3. Copies EverMemOS skills to ~/.claude/skills/
 #   4. Merges hooks into ~/.claude/settings.json (global, all projects)
-#   5. Starts the EverMemOS backend server
+#   5. Generates .0g_secrets (stream_id + encryption_key)
+#   6. Writes stream_id + encryption_key into kv-server config
+#
+# To start services after installation, run: ./start_service.sh
 
 set -e
 
@@ -98,44 +101,15 @@ else
     echo "  ✅ stream_ids and encryption_key written to $KV_CONFIG"
 fi
 
-# ── Step 9: Start kv-server if not already running ───────────────────────────
-echo ""
-echo "▶  Checking kv-server (zgs_kv)..."
-echo ""
-
-KV_BIN="$SCRIPT_DIR/../0g-storage-kv/target/release/zgs_kv"
-KV_RUN_DIR="$SCRIPT_DIR/../0g-storage-kv/run"
-
-if pgrep -f "zgs_kv" > /dev/null 2>&1; then
-    echo "  ✅ kv-server already running, skipping"
-elif [ ! -f "$KV_BIN" ]; then
-    echo "  ⚠️  kv-server binary not found at $KV_BIN, skipping"
-    echo "     Build it first: cd ../0g-storage-kv && cargo build --release"
-else
-    echo "  🚀 Starting kv-server in background..."
-    cd "$KV_RUN_DIR"
-    nohup "$KV_BIN" --config config_testnet_turbo.toml > kv.log 2>&1 &
-    KV_PID=$!
-    cd "$SCRIPT_DIR"
-    echo "  ✅ kv-server started (PID: $KV_PID), logs: $KV_RUN_DIR/kv.log"
-    sleep 2
-fi
-
-# ── Step 10: Start EverMemOS backend ─────────────────────────────────────────
-echo ""
-echo "▶  Starting EverMemOS backend..."
-echo ""
-python3 claude-skills/evermemos-start/scripts/service_manager.py start
-
 # ── Done ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "============================================================"
-echo "  ✅ EverMemOS is ready!"
+echo "  ✅ Installation complete!"
 echo ""
-echo "  API:      http://localhost:1995"
-echo "  Logs:     data/evermemos.log"
-echo "  KV logs:  ../0g-storage-kv/run/kv.log"
 echo "  Secrets:  .0g_secrets"
+echo ""
+echo "  Next step: start services"
+echo "    bash ./start_service.sh"
 echo ""
 echo "  ⚠️  If Claude Code is already running, restart it so the"
 echo "     newly added hooks take effect in all projects."

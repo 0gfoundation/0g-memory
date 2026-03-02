@@ -104,6 +104,7 @@ celerybeat.pid
 # Environments
 .env
 .env.docker
+.0g_secrets
 .venv
 env/
 venv/
