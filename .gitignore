@@ -105,6 +105,7 @@ celerybeat.pid
 .env
 .env.docker
 .0g_secrets
+0g_kv_server/config_testnet_turbo.toml
 .venv
 env/
 venv/

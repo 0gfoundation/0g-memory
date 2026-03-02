@@ -103,11 +103,19 @@ echo ""
 echo "▶  Updating kv-server config (config_testnet_turbo.toml)..."
 echo ""
 
-KV_CONFIG="$SCRIPT_DIR/../0g-storage-kv/run/config_testnet_turbo.toml"
+KV_CONFIG="$SCRIPT_DIR/0g_kv_server/config_testnet_turbo.toml"
+KV_CONFIG_EXAMPLE="$SCRIPT_DIR/0g_kv_server/config_testnet_turbo.toml.example"
 
 if [ ! -f "$KV_CONFIG" ]; then
-    echo "⚠️  kv-server config not found at $KV_CONFIG, skipping"
-else
+    if [ ! -f "$KV_CONFIG_EXAMPLE" ]; then
+        echo "  ⚠️  Neither config nor example found at $SCRIPT_DIR/0g_kv_server/, skipping"
+    else
+        cp "$KV_CONFIG_EXAMPLE" "$KV_CONFIG"
+        echo "  📋 Copied config_testnet_turbo.toml.example → config_testnet_turbo.toml"
+    fi
+fi
+
+if [ -f "$KV_CONFIG" ]; then
     ZEROG_STREAM_ID=$(grep '^ZEROG_STREAM_ID=' .0g_secrets | cut -d'=' -f2)
     ZEROG_ENCRYPTION_KEY=$(grep '^ZEROG_ENCRYPTION_KEY=' .0g_secrets | cut -d'=' -f2)
 

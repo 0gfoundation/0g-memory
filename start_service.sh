@@ -26,14 +26,13 @@ echo ""
 echo "▶  Checking kv-server (zgs_kv)..."
 echo ""
 
-KV_BIN="$SCRIPT_DIR/../0g-storage-kv/target/release/zgs_kv"
-KV_RUN_DIR="$SCRIPT_DIR/../0g-storage-kv/run"
+KV_BIN="$SCRIPT_DIR/0g_kv_server/zgs_kv"
+KV_RUN_DIR="$SCRIPT_DIR/0g_kv_server"
 
 if pgrep -f "zgs_kv" > /dev/null 2>&1; then
     echo "  ✅ kv-server already running, skipping"
 elif [ ! -f "$KV_BIN" ]; then
     echo "  ⚠️  kv-server binary not found at $KV_BIN, skipping"
-    echo "     Build it first: cd ../0g-storage-kv && cargo build --release"
 else
     echo "  🚀 Starting kv-server in background..."
     cd "$KV_RUN_DIR"
@@ -57,6 +56,6 @@ echo "  ✅ EverMemOS is ready!"
 echo ""
 echo "  API:      http://localhost:1995"
 echo "  Logs:     data/evermemos.log"
-echo "  KV logs:  ../0g-storage-kv/run/kv.log"
+echo "  KV logs:  0g_kv_server/kv.log"
 echo "============================================================"
 echo ""
