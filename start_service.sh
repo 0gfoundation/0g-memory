@@ -36,11 +36,32 @@ elif [ ! -f "$KV_BIN" ]; then
 else
     echo "  🚀 Starting kv-server in background..."
     cd "$KV_RUN_DIR"
-    nohup "$KV_BIN" --config config_testnet_turbo.toml > kv.log 2>&1 &
+    # Use append mode so previous logs are preserved
+    nohup "$KV_BIN" --config config_testnet_turbo.toml >> kv.log 2>&1 &
     KV_PID=$!
     cd "$SCRIPT_DIR"
     echo "  ✅ kv-server started (PID: $KV_PID), logs: $KV_RUN_DIR/kv.log"
-    sleep 2
+
+    # Wait until blockchain data is synced
+    # Ready signal: "log sync to block number" appears in log (both cold and warm start cases)
+    echo "  ⏳ Waiting for kv-server to sync blockchain data..."
+    TIMEOUT=300  # 5 minutes max
+    ELAPSED=0
+    KV_LOG="$KV_RUN_DIR/kv.log"
+
+    while [ $ELAPSED -lt $TIMEOUT ]; do
+        if grep -q "log sync to block number" "$KV_LOG" 2>/dev/null; then
+            echo "  ✅ kv-server synced and ready"
+            break
+        fi
+        sleep 3
+        ELAPSED=$((ELAPSED + 3))
+    done
+
+    if [ $ELAPSED -ge $TIMEOUT ]; then
+        echo "  ⚠️  kv-server did not confirm ready within ${TIMEOUT}s, proceeding anyway"
+        echo "     Check logs: $KV_LOG"
+    fi
 fi
 
 # ── Step 2: Start EverMemOS backend ──────────────────────────────────────────
