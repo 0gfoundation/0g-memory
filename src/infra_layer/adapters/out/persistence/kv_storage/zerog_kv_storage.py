@@ -10,6 +10,10 @@ Example: "episodic_memories:6979da5797f9041fc0aa063f"
 Environment Variables Required:
 - ZEROG_WALLET_KEY: Wallet private key (IMPORTANT: Keep secure!)
 
+Auto-generated Secrets (.0g_secrets in project root):
+- ZEROG_STREAM_ID: Unified stream ID, generated once on first startup
+- ZEROG_ENCRYPTION_KEY: AES-256 encryption key, generated once on first startup
+
 Concurrency Model:
 - Single CachedKvClient shared across all coroutines/threads.
 - SDK methods set(), get_bytes(), and commit() are all thread-safe.
@@ -22,17 +26,55 @@ Concurrency Model:
 """
 
 import os
-import random
 import threading
-
-# Fixed encryption key derived from a hardcoded seed.
-# Deterministic across restarts so previously written data remains readable.
-# TODO: replace with a proper key from environment variable before production.
-_rng = random.Random(0x4576_724D_656D_4F53)
-_ENCRYPTION_KEY = bytes(_rng.getrandbits(8) for _ in range(32))
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, Dict, List, Tuple, AsyncIterator
 
+from core.observation.logger import get_logger
+from core.di.decorators import component
+from .kv_storage_interface import KVStorageInterface
+
+from zg_storage import CachedKvClient, EvmClient, UploadOption
+
+logger = get_logger(__name__)
+
+COMMIT_INTERVAL = 20  # seconds between commit attempts
+
+_SECRETS_FILE = ".0g_secrets"
+
+
+def _load_or_generate_secrets() -> tuple[str, bytes]:
+    """
+    Load ZEROG_STREAM_ID and ZEROG_ENCRYPTION_KEY from .0g_secrets.
+    Raises ValueError if the file or either key is missing — run install.sh first.
+    Returns (stream_id: str, encryption_key: bytes).
+    """
+    secrets_path = Path.cwd() / _SECRETS_FILE
+
+    if not secrets_path.exists():
+        raise ValueError(
+            f".0g_secrets not found at {secrets_path}. "
+            f"Please run install.sh to generate it."
+        )
+
+    secrets: dict[str, str] = {}
+    for line in secrets_path.read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if line and '=' in line and not line.startswith('#'):
+            k, v = line.split('=', 1)
+            secrets[k.strip()] = v.strip()
+
+    missing = [k for k in ('ZEROG_STREAM_ID', 'ZEROG_ENCRYPTION_KEY') if k not in secrets]
+    if missing:
+        raise ValueError(
+            f"Missing keys in .0g_secrets: {', '.join(missing)}. "
+            f"Please run install.sh to regenerate it."
+        )
+
+    stream_id = secrets['ZEROG_STREAM_ID']
+    encryption_key = bytes.fromhex(secrets['ZEROG_ENCRYPTION_KEY'])
+    return stream_id, encryption_key
 
 
 class _AtomicInt:
@@ -60,16 +102,6 @@ class _AtomicInt:
     def __bool__(self) -> bool:
         return bool(self._value)
 
-from core.observation.logger import get_logger
-from core.di.decorators import component
-from .kv_storage_interface import KVStorageInterface
-
-from zg_storage import CachedKvClient, EvmClient, UploadOption
-
-logger = get_logger(__name__)
-
-COMMIT_INTERVAL = 20  # seconds between commit attempts
-
 
 @component("zerog_kv_storage")
 class ZeroGKVStorage(KVStorageInterface):
@@ -85,13 +117,14 @@ class ZeroGKVStorage(KVStorageInterface):
     def __init__(
         self,
         kv_url: str,                    # KV node URL for reads/writes
-        stream_id: str,                 # Unified stream ID for all collections
         rpc_url: str,                   # "https://evmrpc-testnet.0g.ai"
         indexer_url: str,               # Indexer URL for uploads
         flow_address: str,              # Flow contract address
         max_queue_size: int = 100,      # Internal write queue size
         max_cache_entries: int = 10000, # Local read cache size
     ):
+        # Load or generate stream_id and encryption_key from .0g_secrets
+        stream_id, encryption_key = _load_or_generate_secrets()
         self.stream_id = stream_id
 
         wallet_private_key = os.getenv('ZEROG_WALLET_KEY')
@@ -111,7 +144,7 @@ class ZeroGKVStorage(KVStorageInterface):
             max_queue_size=max_queue_size,
             max_cache_entries=max_cache_entries,
             upload_option=UploadOption(skip_tx=False),
-            encryption_key=_ENCRYPTION_KEY,
+            encryption_key=encryption_key,
         )
 
         # Atomic counter: ops staged since the last commit.

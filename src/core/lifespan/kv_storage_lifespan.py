@@ -42,10 +42,10 @@ class KVStorageLifespan(LifespanProvider):
         For ZeroG Storage, also requires:
             ZEROG_READ_NODE: KV node URL for reads/writes
             ZEROG_RPC_URL: RPC endpoint URL
-            ZEROG_STREAM_ID: Unified stream ID
             ZEROG_WALLET_KEY: Wallet private key
             ZEROG_INDEXER_URL: Indexer service URL
             ZEROG_FLOW_ADDRESS: Flow contract address
+            (ZEROG_STREAM_ID and ZEROG_ENCRYPTION_KEY are auto-managed in .0g_secrets)
         """
         kv_type = os.getenv("KV_STORAGE_TYPE", "inmemory").lower()
 
@@ -60,7 +60,6 @@ class KVStorageLifespan(LifespanProvider):
 
                 # Read configuration from environment variables
                 kv_url = os.getenv("ZEROG_READ_NODE")
-                stream_id = os.getenv("ZEROG_STREAM_ID")
                 rpc_url = os.getenv("ZEROG_RPC_URL")
                 indexer_url = os.getenv("ZEROG_INDEXER_URL")
                 flow_address = os.getenv("ZEROG_FLOW_ADDRESS")
@@ -69,8 +68,6 @@ class KVStorageLifespan(LifespanProvider):
                 missing_vars = []
                 if not kv_url:
                     missing_vars.append("ZEROG_READ_NODE")
-                if not stream_id:
-                    missing_vars.append("ZEROG_STREAM_ID")
                 if not rpc_url:
                     missing_vars.append("ZEROG_RPC_URL")
                 if not indexer_url:
@@ -85,10 +82,10 @@ class KVStorageLifespan(LifespanProvider):
                     )
 
                 # Create ZeroGKVStorage instance
-                # Note: ZEROG_WALLET_KEY is read inside ZeroGKVStorage.__init__
+                # Note: ZEROG_WALLET_KEY, ZEROG_STREAM_ID, ZEROG_ENCRYPTION_KEY
+                #       are all read/generated inside ZeroGKVStorage.__init__
                 kv_storage = ZeroGKVStorage(
                     kv_url=kv_url,
-                    stream_id=stream_id,
                     rpc_url=rpc_url,
                     indexer_url=indexer_url,
                     flow_address=flow_address,
@@ -96,7 +93,6 @@ class KVStorageLifespan(LifespanProvider):
 
                 logger.info(
                     f"✅ 0G-Storage KV-Storage initialized successfully\n"
-                    f"   Stream ID: {stream_id}\n"
                     f"   KV URL: {kv_url}\n"
                     f"   Indexer URL: {indexer_url}"
                 )

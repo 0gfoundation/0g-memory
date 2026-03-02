@@ -39,7 +39,89 @@ echo "▶  Running setup..."
 echo ""
 python3 claude-skills/evermemos-setup/scripts/setup.py "$@"
 
-# ── Step 7: Start EverMemOS backend ─────────────────────────────────────────
+# ── Step 7: Generate .0g_secrets (stream_id + encryption_key) ───────────────
+echo ""
+echo "▶  Generating 0G secrets (.0g_secrets)..."
+echo ""
+python3 - <<'EOF'
+import os
+from pathlib import Path
+
+secrets_path = Path(".0g_secrets")
+existing = {}
+if secrets_path.exists():
+    for line in secrets_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and "=" in line and not line.startswith("#"):
+            k, v = line.split("=", 1)
+            existing[k.strip()] = v.strip()
+
+changed = False
+if "ZEROG_STREAM_ID" not in existing:
+    existing["ZEROG_STREAM_ID"] = os.urandom(32).hex()
+    changed = True
+    print("  🔑 Generated ZEROG_STREAM_ID")
+else:
+    print("  ✅ ZEROG_STREAM_ID already exists, keeping")
+
+if "ZEROG_ENCRYPTION_KEY" not in existing:
+    existing["ZEROG_ENCRYPTION_KEY"] = os.urandom(32).hex()
+    changed = True
+    print("  🔑 Generated ZEROG_ENCRYPTION_KEY")
+else:
+    print("  ✅ ZEROG_ENCRYPTION_KEY already exists, keeping")
+
+if changed:
+    secrets_path.write_text(
+        "\n".join(f"{k}={v}" for k, v in existing.items()) + "\n",
+        encoding="utf-8",
+    )
+    print("  💾 Saved to .0g_secrets")
+EOF
+
+# ── Step 8: Write stream_id + encryption_key into kv-server config ───────────
+echo ""
+echo "▶  Updating kv-server config (config_testnet_turbo.toml)..."
+echo ""
+
+KV_CONFIG="$SCRIPT_DIR/../0g-storage-kv/run/config_testnet_turbo.toml"
+
+if [ ! -f "$KV_CONFIG" ]; then
+    echo "⚠️  kv-server config not found at $KV_CONFIG, skipping"
+else
+    ZEROG_STREAM_ID=$(grep '^ZEROG_STREAM_ID=' .0g_secrets | cut -d'=' -f2)
+    ZEROG_ENCRYPTION_KEY=$(grep '^ZEROG_ENCRYPTION_KEY=' .0g_secrets | cut -d'=' -f2)
+
+    sed -i "s|stream_ids = \[\"[^\"]*\"\]|stream_ids = [\"$ZEROG_STREAM_ID\"]|" "$KV_CONFIG"
+    sed -i "s|encryption_key = \"[^\"]*\"|encryption_key = \"$ZEROG_ENCRYPTION_KEY\"|" "$KV_CONFIG"
+
+    echo "  ✅ stream_ids and encryption_key written to $KV_CONFIG"
+fi
+
+# ── Step 9: Start kv-server if not already running ───────────────────────────
+echo ""
+echo "▶  Checking kv-server (zgs_kv)..."
+echo ""
+
+KV_BIN="$SCRIPT_DIR/../0g-storage-kv/target/release/zgs_kv"
+KV_RUN_DIR="$SCRIPT_DIR/../0g-storage-kv/run"
+
+if pgrep -f "zgs_kv" > /dev/null 2>&1; then
+    echo "  ✅ kv-server already running, skipping"
+elif [ ! -f "$KV_BIN" ]; then
+    echo "  ⚠️  kv-server binary not found at $KV_BIN, skipping"
+    echo "     Build it first: cd ../0g-storage-kv && cargo build --release"
+else
+    echo "  🚀 Starting kv-server in background..."
+    cd "$KV_RUN_DIR"
+    nohup "$KV_BIN" --config config_testnet_turbo.toml > kv.log 2>&1 &
+    KV_PID=$!
+    cd "$SCRIPT_DIR"
+    echo "  ✅ kv-server started (PID: $KV_PID), logs: $KV_RUN_DIR/kv.log"
+    sleep 2
+fi
+
+# ── Step 10: Start EverMemOS backend ─────────────────────────────────────────
 echo ""
 echo "▶  Starting EverMemOS backend..."
 echo ""
@@ -50,8 +132,10 @@ echo ""
 echo "============================================================"
 echo "  ✅ EverMemOS is ready!"
 echo ""
-echo "  API:  http://localhost:1995"
-echo "  Logs: data/evermemos.log"
+echo "  API:      http://localhost:1995"
+echo "  Logs:     data/evermemos.log"
+echo "  KV logs:  ../0g-storage-kv/run/kv.log"
+echo "  Secrets:  .0g_secrets"
 echo ""
 echo "  ⚠️  If Claude Code is already running, restart it so the"
 echo "     newly added hooks take effect in all projects."
