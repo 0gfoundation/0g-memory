@@ -84,17 +84,28 @@ if [ "$KV_STARTED" = true ]; then
     fi
 fi
 
-# ── Step 2b: Wait for Docker services ready (MongoDB port 27017) ─────────────
+# ── Step 2b: Wait for Docker services ready (MongoDB 27017 + Elasticsearch 9200) ─
 echo ""
 echo "  ⏳ Waiting for Docker services to be ready..."
-TIMEOUT=120  # 2 minutes max
+TIMEOUT=180  # 3 minutes max (ES cold-start after volume wipe can be slow)
 ELAPSED=0
 
 while [ $ELAPSED -lt $TIMEOUT ]; do
-    if (echo > /dev/tcp/localhost/27017) 2>/dev/null; then
-        echo "  ✅ Docker services ready"
+    MONGO_OK=false
+    ES_OK=false
+
+    (echo > /dev/tcp/localhost/27017) 2>/dev/null && MONGO_OK=true
+    (echo > /dev/tcp/localhost/19200) 2>/dev/null && ES_OK=true
+
+    if [ "$MONGO_OK" = true ] && [ "$ES_OK" = true ]; then
+        echo "  ✅ MongoDB ready (port 27017)"
+        echo "  ✅ Elasticsearch ready (port 19200)"
         break
     fi
+
+    [ "$MONGO_OK" = false ] && echo "  ⏳ Waiting for MongoDB (27017)..."    || true
+    [ "$ES_OK"    = false ] && echo "  ⏳ Waiting for Elasticsearch (19200)..." || true
+
     sleep 3
     ELAPSED=$((ELAPSED + 3))
 done
