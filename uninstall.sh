@@ -5,6 +5,8 @@
 #   ./uninstall.sh
 #
 # What this does (reverse order of install.sh):
+#   0. Stops EverMemOS backend and kv-server (if running)
+#   0b. Removes Docker containers AND volumes (docker-compose down -v)
 #   9. Deletes 0g_kv_server/config_testnet_turbo.toml
 #   8. Deletes .0g_secrets
 #   7. Uninstalls 0G Storage SDK from uv venv
@@ -20,11 +22,55 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ── Detect docker compose command ────────────────────────────────────────────
+if command -v docker-compose &>/dev/null; then
+    COMPOSE_CMD="docker-compose"
+else
+    COMPOSE_CMD="docker compose"
+fi
+
 echo ""
 echo "============================================================"
 echo "           EverMemOS Uninstaller"
 echo "============================================================"
 echo ""
+
+# ── Step 0: Stop all running services ────────────────────────────────────────
+echo "▶  Stopping running services..."
+echo ""
+
+# Stop EverMemOS backend
+python3 claude-skills/evermemos-start/scripts/service_manager.py stop 2>/dev/null || true
+if pgrep -f "src/run.py" > /dev/null 2>&1; then
+    pkill -TERM -f "src/run.py" 2>/dev/null || true
+    sleep 2
+    pkill -KILL -f "src/run.py" 2>/dev/null || true
+    echo "  ✅ EverMemOS backend stopped"
+else
+    echo "  ℹ️  EverMemOS backend was not running"
+fi
+
+# Stop kv-server
+if pgrep -f "zgs_kv" > /dev/null 2>&1; then
+    pkill -f "zgs_kv" 2>/dev/null || true
+    echo "  ✅ kv-server stopped"
+else
+    echo "  ℹ️  kv-server was not running"
+fi
+
+# ── Step 0b: Remove Docker containers and volumes ────────────────────────────
+echo ""
+echo "▶  Removing Docker containers and volumes..."
+echo ""
+if [ -n "$($COMPOSE_CMD ps -q 2>/dev/null)" ]; then
+    echo "  🗑️  Running: $COMPOSE_CMD down -v"
+    $COMPOSE_CMD down -v
+    echo "  ✅ Containers and volumes removed"
+else
+    # Containers may not be listed by ps -q if already removed, but try anyway
+    # to ensure volumes are cleaned up
+    $COMPOSE_CMD down -v 2>/dev/null && echo "  ✅ Containers and volumes removed" || echo "  ℹ️  No containers found, skipping"
+fi
 
 # ── 0g_kv_server cleanup (binary + config + runtime data) ────────────────────
 echo "▶  Removing 0g_kv_server files..."
