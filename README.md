@@ -6,9 +6,9 @@ EverMemOS gives Claude Code persistent memory across sessions. Every conversatio
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.12
 - Docker 20.10+ (auto-installed if missing)
-- [uv](https://astral.sh/uv/) package manager
+- [uv](https://astral.sh/uv/) package manager (auto-installed if missing)
 - 4 GB RAM
 
 ---

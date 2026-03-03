@@ -6,13 +6,14 @@
 #   ./install.sh --non-interactive  # fully automated (CI / headless)
 #
 # What this does:
-#   1. Installs uv + Python dependencies
-#   2. Starts Docker services (MongoDB, Elasticsearch, Milvus, Redis)
-#   3. Copies EverMemOS skills to ~/.claude/skills/
-#   4. Merges hooks into ~/.claude/settings.json (global, all projects)
-#   5. Installs 0G Storage SDK into uv venv
-#   6. Generates .0g_secrets (stream_id + encryption_key)
-#   7. Writes stream_id + encryption_key into kv-server config
+#   1. Checks Python version (3.12 required)
+#   2. Checks / auto-installs uv package manager
+#   3. Installs Python dependencies (uv sync)
+#   4. Verifies Docker is installed, creates .env and data/
+#   5. Copies EverMemOS skills to ~/.claude/skills/ and merges hooks into ~/.claude/settings.json
+#   6. Installs 0G Storage SDK into uv venv
+#   7. Generates .0g_secrets (stream_id + encryption_key)
+#   8. Writes stream_id + encryption_key into kv-server config
 #
 # To start services after installation, run: ./start_service.sh
 
@@ -30,20 +31,25 @@ echo ""
 
 # ── Check Python 3 ──────────────────────────────────────────────────────────
 if ! command -v python3 &>/dev/null; then
-    echo "❌ python3 not found. Please install Python 3.8+ and retry."
+    echo "❌ python3 not found. Please install Python 3.12 and retry."
     exit 1
 fi
 
 PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 echo "✅ Python $PYTHON_VERSION"
 
-# ── Step 1-5: Setup (deps, Docker, skills, global hooks) ────────────────────
+# ── Step 1-5: Setup (via setup.py) ──────────────────────────────────────────
+#   1. Checks Python version (3.12 required)
+#   2. Checks / auto-installs uv package manager
+#   3. Installs Python dependencies (uv sync)
+#   4. Verifies Docker is installed, creates .env and data/
+#   5. Copies EverMemOS skills to ~/.claude/skills/ and merges hooks into ~/.claude/settings.json
 echo ""
 echo "▶  Running setup..."
 echo ""
 python3 claude-skills/evermemos-setup/scripts/setup.py "$@"
 
-# ── Step 7: Install 0G Storage SDK into uv venv ──────────────────────────────
+# ── Step 6: Install 0G Storage SDK into uv venv ──────────────────────────────
 echo ""
 echo "▶  Installing 0G Storage SDK..."
 echo ""
@@ -58,7 +64,7 @@ else
     echo "  ✅ 0G Storage SDK installed"
 fi
 
-# ── Step 8: Generate .0g_secrets (stream_id + encryption_key) ───────────────
+# ── Step 7: Generate .0g_secrets (stream_id + encryption_key) ───────────────
 echo ""
 echo "▶  Generating 0G secrets (.0g_secrets)..."
 echo ""
@@ -98,7 +104,7 @@ if changed:
     print("  💾 Saved to .0g_secrets")
 EOF
 
-# ── Step 9: Write stream_id + encryption_key into kv-server config ───────────
+# ── Step 8: Write stream_id + encryption_key into kv-server config ───────────
 echo ""
 echo "▶  Updating kv-server config (config_testnet_turbo.toml)..."
 echo ""

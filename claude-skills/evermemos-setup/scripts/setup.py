@@ -93,8 +93,8 @@ class SetupManager:
         self.print_info("Checking Python version...")
         version = sys.version_info
 
-        if version.major < 3 or (version.major == 3 and version.minor < 8):
-            self.print_error(f"Python 3.8+ required, found {version.major}.{version.minor}")
+        if version.major < 3 or (version.major == 3 and version.minor < 12):
+            self.print_error(f"Python 3.12 required, found {version.major}.{version.minor}")
             return False
 
         self.print_success(f"Python {version.major}.{version.minor}.{version.micro}")
@@ -527,8 +527,12 @@ class SetupManager:
 
         # Create data directory
         data_dir = self.project_dir / "data"
+        created = not data_dir.exists()
         data_dir.mkdir(exist_ok=True)
-        self.print_success("Created data directory")
+        if created:
+            self.print_success("Created data directory")
+        else:
+            self.print_info("data directory already exists")
 
         return True
 
