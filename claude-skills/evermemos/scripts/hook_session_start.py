@@ -7,6 +7,7 @@ Load recent memory context when Claude Code session starts
 import json
 import sys
 import os
+import urllib.request
 
 # Add current directory to path to import evermemos_client
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -28,6 +29,15 @@ except ImportError as e:
 
 # Global logger instance
 logger = get_logger("hook_session_start")
+
+
+def _is_service_available():
+    base_url = os.environ.get('EVERMEMOS_BASE_URL', 'http://localhost:1995')
+    try:
+        urllib.request.urlopen(f"{base_url}/health", timeout=1)
+        return True
+    except Exception:
+        return False
 
 
 def get_env_config():
@@ -78,6 +88,10 @@ def format_context_for_claude(memories, pending_messages):
 
 def main():
     """Main execution"""
+    if not _is_service_available():
+        print(json.dumps({"continue": True, "suppressOutput": True, "hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ""}}))
+        sys.exit(0)
+
     try:
         # Get configuration
         config = get_env_config()

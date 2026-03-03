@@ -7,6 +7,7 @@ Record tool usage to EverMemOS for operation history
 import json
 import sys
 import os
+import urllib.request
 from datetime import datetime
 
 # Add current directory to path to import evermemos_client
@@ -26,6 +27,15 @@ except ImportError as e:
 
 # Global logger instance
 logger = get_logger("hook_tool_use")
+
+
+def _is_service_available():
+    base_url = os.environ.get('EVERMEMOS_BASE_URL', 'http://localhost:1995')
+    try:
+        urllib.request.urlopen(f"{base_url}/health", timeout=1)
+        return True
+    except Exception:
+        return False
 
 
 def read_hook_input():
@@ -229,6 +239,10 @@ def extract_last_assistant_message_from_transcript(transcript_path):
 
 def main():
     """Main execution"""
+    if not _is_service_available():
+        print(json.dumps({"continue": True, "suppressOutput": True}))
+        sys.exit(0)
+
     try:
         # Read hook input
         hook_data = read_hook_input()

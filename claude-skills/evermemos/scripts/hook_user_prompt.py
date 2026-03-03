@@ -7,6 +7,7 @@ Automatically store user messages to EverMemOS
 import json
 import sys
 import os
+import urllib.request
 
 # Add current directory to path to import evermemos_client
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +26,15 @@ except ImportError as e:
 
 # Global logger instance
 logger = get_logger("hook_user_prompt")
+
+
+def _is_service_available():
+    base_url = os.environ.get('EVERMEMOS_BASE_URL', 'http://localhost:1995')
+    try:
+        urllib.request.urlopen(f"{base_url}/health", timeout=1)
+        return True
+    except Exception:
+        return False
 
 
 def read_hook_input():
@@ -77,6 +87,10 @@ def get_env_config():
 
 def main():
     """Main execution"""
+    if not _is_service_available():
+        print(json.dumps({"continue": True, "suppressOutput": True}))
+        sys.exit(0)
+
     try:
         # Read hook input
         hook_data = read_hook_input()
