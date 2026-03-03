@@ -26,8 +26,7 @@ kv_db_file = "kv.DB"
 ###                     Log Sync Config Options                     ###
 #######################################################################
 
-# TODO: Replace with your actual blockchain RPC endpoint.
-blockchain_rpc_endpoint = "https://evmrpc-testnet.0g.ai/YOUR_API_KEY_HERE"
+blockchain_rpc_endpoint = "https://evmrpc-testnet.0g.ai"
 log_contract_address = "0x22E03a6A89B950F1c82ec5e74F8eCa321a105296"
 log_sync_start_block_number = 1
 

@@ -512,16 +512,16 @@ class SetupManager:
             return False
         self.print_success("docker-compose.yaml found")
 
-        # Create .env from env.template if not exists
+        # Create .env from env.template.0g.example if not exists
         env_file = self.project_dir / ".env"
-        template_file = self.project_dir / "env.template"
+        template_file = self.project_dir / "env.template.0g.example"
         if not env_file.exists():
             if template_file.exists():
                 shutil.copy2(template_file, env_file)
-                self.print_success("Created .env from env.template")
-                self.print_warning("Please edit .env and set LLM_API_KEY and VECTORIZE_API_KEY")
+                self.print_success("Created .env from env.template.0g.example")
+                self.print_warning("Please edit .env and fill in your private keys and API keys")
             else:
-                self.print_warning(".env not found and env.template missing — please create .env manually")
+                self.print_warning(".env not found and env.template.0g.example missing — please create .env manually")
         else:
             self.print_info(".env already exists")
 
