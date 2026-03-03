@@ -391,9 +391,9 @@ class SetupManager:
 
         return False
 
-    def setup_standard_mode(self, non_interactive: bool = False) -> bool:
-        """Setup standard mode (Docker-based)"""
-        self.print_header("Setting Up Standard Mode (Docker)")
+    def setup_docker_compose(self, non_interactive: bool = False) -> bool:
+        """Check Docker / Docker Compose availability and verify docker-compose.yaml"""
+        self.print_header("Setting Up Docker Compose")
         self.print_info("Standard mode uses Docker containers for all services")
 
         # Check Docker
@@ -683,7 +683,7 @@ class SetupManager:
             return False
 
         # Step 4: Setup Docker services
-        if not self.setup_standard_mode(non_interactive=non_interactive):
+        if not self.setup_docker_compose(non_interactive=non_interactive):
             return False
 
         # Step 5: Install skills + hooks into Claude Code global config
