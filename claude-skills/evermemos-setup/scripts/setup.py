@@ -530,25 +530,6 @@ class SetupManager:
         data_dir.mkdir(exist_ok=True)
         self.print_success("Created data directory")
 
-        # Start Docker services
-        self.print_info("\nStarting Docker services...")
-        self.print_warning("This may take a few minutes on first run...")
-
-        compose_cmd = ["docker-compose", "up", "-d"] if has_compose_v1 else ["docker", "compose", "up", "-d"]
-        success, output = self.run_command(compose_cmd, check=False, capture=False)
-
-        if success:
-            self.print_success("Docker services started")
-            self.print_info("Services running:")
-            self.print_info("  - MongoDB: localhost:27017")
-            self.print_info("  - Elasticsearch: localhost:19200")
-            self.print_info("  - Milvus: localhost:19530")
-            self.print_info("  - Redis: localhost:6379")
-        else:
-            self.print_warning("Failed to start Docker services")
-            self.print_info("You can start them manually later with:")
-            self.print_info(f"  {' '.join(compose_cmd)}")
-
         return True
 
     def install_dependencies(self) -> bool:
