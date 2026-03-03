@@ -694,33 +694,6 @@ class SetupManager:
                 "You can re-run setup to retry."
             )
 
-        # Success
-        self.print_header("Setup Complete! 🎉")
-        self.print_success("EverMemOS is ready to use")
-        print()
-        self.print_info("Docker services started:")
-        print("  • MongoDB: localhost:27017")
-        print("  • Elasticsearch: localhost:19200")
-        print("  • Milvus: localhost:19530")
-        print("  • Redis: localhost:6379")
-        print()
-        self.print_info("Configuration: .env")
-        print()
-        self.print_info("Next steps:")
-        print("  1. Configure API keys in .env file:")
-        print("     cp env.template .env")
-        print("     # Edit .env and set LLM_API_KEY and VECTORIZE_API_KEY")
-        print()
-        print("  2. Start EverMemOS:")
-        print("     uv run python src/run.py --port 1995")
-        print()
-        print("  3. Check Docker status:")
-        print("     docker ps")
-        print()
-        print("  4. View logs:")
-        print("     docker-compose logs -f")
-        print()
-
         return True
 
 
