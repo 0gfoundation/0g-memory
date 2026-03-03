@@ -37,7 +37,7 @@ fi
 PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 echo "✅ Python $PYTHON_VERSION"
 
-# ── Step 1-6: Setup (deps, Docker, skills, global hooks) ────────────────────
+# ── Step 1-5: Setup (deps, Docker, skills, global hooks) ────────────────────
 echo ""
 echo "▶  Running setup..."
 echo ""
