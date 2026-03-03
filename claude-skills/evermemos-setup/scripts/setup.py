@@ -33,7 +33,6 @@ class SetupManager:
     def __init__(self, project_dir: Optional[str] = None):
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
         self.os_type = platform.system().lower()
-        self.setup_mode = "lite"  # lite, standard, full
 
     def print_header(self, text: str):
         """Print formatted header"""
@@ -505,170 +504,13 @@ class SetupManager:
                     self.print_info("  https://docs.docker.com/compose/install/")
                     return False
 
-        # Create docker-compose.yml
-        compose_file = self.project_dir / "docker-compose.yml"
+        # Verify docker-compose.yaml exists (must be present after git clone)
+        compose_file = self.project_dir / "docker-compose.yaml"
         if not compose_file.exists():
-            self.print_info("Creating docker-compose.yml...")
-
-            compose_content = """services:
-  # MongoDB database
-  mongodb:
-    image: mongo:7.0
-    container_name: memsys-mongodb
-    restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: memsys123
-      MONGO_INITDB_DATABASE: memsys
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-      - ./docker/mongodb/init:/docker-entrypoint-initdb.d
-    networks:
-      - memsys-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Elasticsearch search engine
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-    container_name: memsys-elasticsearch
-    restart: unless-stopped
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
-      - bootstrap.memory_lock=true
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    ports:
-      - "19200:9200"
-      - "19300:9300"
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
-    networks:
-      - memsys-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Milvus vector database
-  milvus-etcd:
-    image: quay.io/coreos/etcd:v3.5.5
-    container_name: memsys-milvus-etcd
-    restart: unless-stopped
-    environment:
-      - ETCD_AUTO_COMPACTION_MODE=revision
-      - ETCD_AUTO_COMPACTION_RETENTION=1000
-      - ETCD_QUOTA_BACKEND_BYTES=4294967296
-      - ETCD_SNAPSHOT_COUNT=50000
-    command: etcd -advertise-client-urls=http://127.0.0.1:2479 -listen-client-urls http://0.0.0.0:2479 --data-dir /etcd
-    healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health", "--endpoints=http://localhost:2479"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    volumes:
-      - milvus_etcd_data:/etcd
-    networks:
-      - memsys-network
-
-  milvus-minio:
-    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
-    container_name: memsys-milvus-minio
-    restart: unless-stopped
-    environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-    ports:
-      - "9001:9001"
-      - "9000:9000"
-    command: minio server /minio_data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    volumes:
-      - milvus_minio_data:/minio_data
-    networks:
-      - memsys-network
-
-  milvus-standalone:
-    image: milvusdb/milvus:v2.5.2
-    container_name: memsys-milvus-standalone
-    restart: unless-stopped
-    command: ["milvus", "run", "standalone"]
-    environment:
-      ETCD_ENDPOINTS: milvus-etcd:2479
-      MINIO_ADDRESS: milvus-minio:9000
-    ports:
-      - "19530:19530"
-      - "9091:9091"
-    volumes:
-      - milvus_data:/var/lib/milvus
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-      start_period: 90s
-    depends_on:
-      - milvus-etcd
-      - milvus-minio
-    networks:
-      - memsys-network
-
-  # Redis cache
-  redis:
-    image: redis:7.2-alpine
-    container_name: memsys-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - memsys-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-volumes:
-  mongodb_data:
-    driver: local
-  elasticsearch_data:
-    driver: local
-  milvus_etcd_data:
-    driver: local
-  milvus_minio_data:
-    driver: local
-  milvus_data:
-    driver: local
-  redis_data:
-    driver: local
-
-networks:
-  memsys-network:
-    driver: bridge
-"""
-            compose_file.write_text(compose_content)
-            self.print_success("Created docker-compose.yml")
-        else:
-            self.print_info("docker-compose.yml already exists")
+            self.print_error("docker-compose.yaml not found.")
+            self.print_info("Make sure you cloned the full repository.")
+            return False
+        self.print_success("docker-compose.yaml found")
 
         # Create .env from env.template if not exists
         env_file = self.project_dir / ".env"
