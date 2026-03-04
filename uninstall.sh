@@ -7,8 +7,8 @@
 # What this does (reverse order of install.sh):
 #   0. Stops EverMemOS backend and kv-server (if running)
 #   0b. Removes Docker containers AND volumes (docker-compose down -v)
-#   8. Deletes 0g_kv_server/config_testnet_turbo.toml
-#   7. Deletes .0g_secrets
+#   7 (kv-server): Deletes config_testnet_turbo.toml, zgs_kv binary, db/, kv.DB, kv_*.log
+#   6 (reverse): Deletes .0g_secrets
 #   6b. Removes EverMemOS hooks and env vars from ~/.claude/settings.json
 #   6a. Removes EverMemOS skills from ~/.claude/skills/
 #   5b. Deletes runtime files in logs/ (evermemos_*.log, evermemos.pid)

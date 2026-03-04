@@ -9,7 +9,7 @@
 #   1. Checks Python version (3.12 required)
 #   2. Checks / auto-installs uv package manager
 #   3. Installs Python dependencies (uv sync)
-#   4. Verifies Docker is installed, creates .env and data/
+#   4. Verifies Docker is installed, creates .env from template
 #   5. Copies EverMemOS skills to ~/.claude/skills/ and merges hooks into ~/.claude/settings.json
 #   6. Generates .0g_secrets (stream_id + encryption_key)
 #   7. Writes stream_id + encryption_key into kv-server config
@@ -44,7 +44,7 @@ echo "✅ Python $PYTHON_VERSION (uv will manage Python 3.12 for the application
 #   1. Checks Python version (3.12 required)
 #   2. Checks / auto-installs uv package manager
 #   3. Installs Python dependencies (uv sync)
-#   4. Verifies Docker is installed, creates .env and data/
+#   4. Verifies Docker is installed, creates .env from template
 #   5. Copies EverMemOS skills to ~/.claude/skills/ and merges hooks into ~/.claude/settings.json
 echo ""
 echo "▶  Running setup..."
