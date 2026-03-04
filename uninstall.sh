@@ -72,6 +72,7 @@ else
 fi
 
 # ── 0g_kv_server cleanup (binary + config + runtime data) ────────────────────
+echo ""
 echo "▶  Removing 0g_kv_server files..."
 KV_DIR="$SCRIPT_DIR/0g_kv_server"
 for target in "$KV_DIR/zgs_kv" "$KV_DIR/config_testnet_turbo.toml" "$KV_DIR/db" "$KV_DIR/kv.DB"; do

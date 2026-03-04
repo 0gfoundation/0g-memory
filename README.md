@@ -68,7 +68,7 @@ This starts:
 
 ```bash
 # All 6 Docker containers should show "Up" or "healthy"
-docker-compose ps
+docker compose ps   # or: docker-compose ps
 
 # EverMemOS backend health check
 curl http://localhost:1995/health
