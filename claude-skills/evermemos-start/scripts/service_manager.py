@@ -13,6 +13,7 @@ import time
 import json
 import urllib.request
 import urllib.error
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict
 
@@ -22,8 +23,12 @@ class ServiceManager:
 
     def __init__(self, project_dir: Optional[str] = None):
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
-        self.pid_file = self.project_dir / "data" / "evermemos.pid"
-        self.log_file = self.project_dir / "data" / "evermemos.log"
+        logs_dir = self.project_dir / "logs"
+        self.pid_file = logs_dir / "evermemos.pid"
+        # Point to the latest existing log file; overridden with a new timestamped
+        # file when start() is called.
+        existing_logs = sorted(logs_dir.glob("evermemos_*.log")) if logs_dir.exists() else []
+        self.log_file = existing_logs[-1] if existing_logs else logs_dir / "evermemos.log"
 
     def is_running(self) -> bool:
         """Check if service is running"""
@@ -72,8 +77,12 @@ class ServiceManager:
             print("✅ EverMemOS is already running")
             return True
 
-        # Ensure data directory exists
-        (self.project_dir / "data").mkdir(exist_ok=True)
+        # Ensure logs directory exists
+        (self.project_dir / "logs").mkdir(exist_ok=True)
+
+        # Create a new timestamped log file for this run (UTC)
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        self.log_file = self.project_dir / "logs" / f"evermemos_{ts}.log"
 
         print(f"ℹ️  Using configuration: .env")
 

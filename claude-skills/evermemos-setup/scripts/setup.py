@@ -89,15 +89,20 @@ class SetupManager:
         return success
 
     def check_python(self) -> bool:
-        """Check Python version"""
+        """Check Python version.
+
+        Only requires 3.8+ to run this installer script.
+        The application itself requires Python 3.12, which uv manages
+        automatically via pyproject.toml (requires-python = ">=3.12,<3.13").
+        """
         self.print_info("Checking Python version...")
         version = sys.version_info
 
-        if version.major < 3 or (version.major == 3 and version.minor < 12):
-            self.print_error(f"Python 3.12 required, found {version.major}.{version.minor}")
+        if version.major < 3 or (version.major == 3 and version.minor < 8):
+            self.print_error(f"Python 3.8+ required to run this installer, found {version.major}.{version.minor}")
             return False
 
-        self.print_success(f"Python {version.major}.{version.minor}.{version.micro}")
+        self.print_success(f"Python {version.major}.{version.minor}.{version.micro} (uv will manage Python 3.12 for the application)")
         return True
 
     def check_uv(self) -> bool:
@@ -524,15 +529,6 @@ class SetupManager:
                 self.print_warning(".env not found and env.template.0g.example missing — please create .env manually")
         else:
             self.print_info(".env already exists")
-
-        # Create data directory
-        data_dir = self.project_dir / "data"
-        created = not data_dir.exists()
-        data_dir.mkdir(exist_ok=True)
-        if created:
-            self.print_success("Created data directory")
-        else:
-            self.print_info("data directory already exists")
 
         return True
 

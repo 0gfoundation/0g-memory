@@ -12,7 +12,7 @@
 #   7. Uninstalls 0G Storage SDK from uv venv
 #   6b. Removes EverMemOS hooks and env vars from ~/.claude/settings.json
 #   6a. Removes EverMemOS skills from ~/.claude/skills/
-#   5b. Deletes runtime files in data/ (evermemos.log, evermemos.pid)
+#   5b. Deletes runtime files in logs/ (evermemos_*.log, evermemos.pid)
 #   5a. Deletes .env
 #   3. Deletes .venv/
 
@@ -182,17 +182,30 @@ if [ "$found" = false ]; then
     echo "  ℹ️  No EverMemOS skills found in $SKILLS_DIR, skipping"
 fi
 
-# ── Step 5b (reverse): Delete runtime-generated files in data/ ───────────────
+# ── Step 5b (reverse): Delete runtime-generated files in logs/ ───────────────
 echo ""
-echo "▶  Removing runtime files in data/..."
-for f in "$SCRIPT_DIR/data/evermemos.log" "$SCRIPT_DIR/data/evermemos.pid"; do
-    if [ -f "$f" ]; then
+echo "▶  Removing runtime files in logs/..."
+LOG_DIR="$SCRIPT_DIR/logs"
+if [ -d "$LOG_DIR" ]; then
+    # Remove all timestamped log files
+    log_count=0
+    for f in "$LOG_DIR"/evermemos_*.log; do
+        [ -f "$f" ] || continue
         rm "$f"
         echo "  ✅ Deleted $f"
+        log_count=$((log_count + 1))
+    done
+    [ "$log_count" -eq 0 ] && echo "  ℹ️  No log files found, skipping"
+    # Remove PID file
+    if [ -f "$LOG_DIR/evermemos.pid" ]; then
+        rm "$LOG_DIR/evermemos.pid"
+        echo "  ✅ Deleted $LOG_DIR/evermemos.pid"
     else
-        echo "  ℹ️  $f not found, skipping"
+        echo "  ℹ️  evermemos.pid not found, skipping"
     fi
-done
+else
+    echo "  ℹ️  logs/ directory not found, skipping"
+fi
 
 # ── Step 5a (reverse): Delete .env ───────────────────────────────────────────
 echo ""

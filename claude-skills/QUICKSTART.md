@@ -123,7 +123,7 @@ Claude: 好的，我来启动服务。
 
 🚀 Starting EverMemOS in background...
 ✅ EverMemOS started successfully (PID: 12345)
-📝 Logs: /path/to/data/evermemos.log
+📝 Logs: logs/evermemos_<timestamp>.log
 🌐 API: http://localhost:1995
 
 服务已启动并运行中！
@@ -375,7 +375,7 @@ vi .env.lite
 
 ```bash
 # 实时查看
-tail -f data/evermemos.log
+tail -f $(ls -t logs/evermemos_*.log | head -1)
 
 # 或使用 skill
 /evermemos-start logs

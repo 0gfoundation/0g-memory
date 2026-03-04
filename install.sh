@@ -30,13 +30,16 @@ echo "============================================================"
 echo ""
 
 # ── Check Python 3 ──────────────────────────────────────────────────────────
+# Only needs to be Python 3.8+ to run this installer script.
+# The actual application requires Python 3.12, which uv manages automatically
+# via pyproject.toml (requires-python = ">=3.12,<3.13").
 if ! command -v python3 &>/dev/null; then
-    echo "❌ python3 not found. Please install Python 3.12 and retry."
+    echo "❌ python3 not found. Please install Python 3.8+ and retry."
     exit 1
 fi
 
 PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-echo "✅ Python $PYTHON_VERSION"
+echo "✅ Python $PYTHON_VERSION (uv will manage Python 3.12 for the application)"
 
 # ── Step 1-5: Setup (via setup.py) ──────────────────────────────────────────
 #   1. Checks Python version (3.12 required)

@@ -118,7 +118,7 @@ Specifically removes:
 
 | What | Command |
 |---|---|
-| EverMemOS backend | `tail -f data/evermemos.log` |
+| EverMemOS backend | `tail -f $(ls -t logs/evermemos_*.log | head -1)` |
 | kv-server | `tail -f 0g_kv_server/kv.log` |
 | Hook activity | `tail -f ~/.claude/logs/hook_user_prompt.log` |
 
@@ -126,15 +126,16 @@ Quick health check across all components:
 
 ```bash
 # Backend: messages received and memories extracted
-grep "Received memorize request\|Memory request processing completed" data/evermemos.log | tail -20
+LOG=$(ls -t logs/evermemos_*.log | head -1)
+grep "Received memorize request\|Memory request processing completed" "$LOG" | tail -20
 
 # Search calls (what Claude searched for)
-grep "Received search request" data/evermemos.log | tail -10
+grep "Received search request" "$LOG" | tail -10
 
 # Per sender type
-grep "sender_name=User"            data/evermemos.log | wc -l
-grep "sender_name=Claude (Response)" data/evermemos.log | wc -l
-grep "sender_name=Claude (Tool)"   data/evermemos.log | wc -l
+grep "sender_name=User"             "$LOG" | wc -l
+grep "sender_name=Claude (Response)" "$LOG" | wc -l
+grep "sender_name=Claude (Tool)"    "$LOG" | wc -l
 ```
 
 ---

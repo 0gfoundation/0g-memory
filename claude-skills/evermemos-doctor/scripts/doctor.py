@@ -169,7 +169,7 @@ class Doctor:
 
     def check_service_running(self) -> bool:
         """Check if service is running"""
-        pid_file = self.project_dir / "data" / "evermemos.pid"
+        pid_file = self.project_dir / "logs" / "evermemos.pid"
 
         if not pid_file.exists():
             return self.check(
@@ -283,9 +283,11 @@ class Doctor:
 
     def check_log_file(self) -> bool:
         """Check log file for recent errors"""
-        log_file = self.project_dir / "data" / "evermemos.log"
+        logs_dir = self.project_dir / "logs"
+        existing_logs = sorted(logs_dir.glob("evermemos_*.log")) if logs_dir.exists() else []
+        log_file = existing_logs[-1] if existing_logs else None
 
-        if not log_file.exists():
+        if log_file is None:
             self.info("No log file found (service not started yet)")
             return True
 

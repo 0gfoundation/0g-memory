@@ -42,7 +42,7 @@ I'll start EverMemOS for you.
 
 🚀 Starting EverMemOS in background...
 ✅ EverMemOS started successfully (PID: 12345)
-📝 Logs: /path/to/evermemos.log
+📝 Logs: logs/evermemos_<timestamp>.log
 🌐 API: http://localhost:1995
 
 The service is now running!
@@ -72,7 +72,7 @@ or
 ```
 🚀 Starting EverMemOS in background...
 ✅ EverMemOS started successfully (PID: 12345)
-📝 Logs: /path/to/data/evermemos.log
+📝 Logs: logs/evermemos_<timestamp>.log
 🌐 API: http://localhost:1995
 ```
 
@@ -143,7 +143,7 @@ or
 🌐 API: http://localhost:1995 ✅
 ⚙️  Config: docker
 
-📝 Logs: tail -f /path/to/data/evermemos.log
+📝 Logs: tail -f $(ls -t logs/evermemos_*.log | head -1)
 ⏹️  Stop: /evermemos-start stop
 
 ============================================================
@@ -182,7 +182,7 @@ Claude: I'll start EverMemOS for you.
 
 🚀 Starting EverMemOS in background...
 ✅ EverMemOS started successfully (PID: 12345)
-📝 Logs: /path/to/evermemos.log
+📝 Logs: logs/evermemos_<timestamp>.log
 🌐 API: http://localhost:1995
 
 EverMemOS is now running! You can:
@@ -282,10 +282,10 @@ python3 scripts/service_manager.py start --foreground
 ## File Locations
 
 ### PID File
-`data/evermemos.pid` - Contains process ID
+`logs/evermemos.pid` - Contains process ID
 
 ### Log File
-`data/evermemos.log` - Service logs
+`logs/evermemos_<timestamp>.log` - Service logs (one file per start, timestamp in UTC)
 
 ### Configuration
 `.env` or `.env` - Environment configuration
@@ -358,7 +358,7 @@ Let me run a full diagnostic:
 
 **View logs:**
 ```bash
-tail -f /path/to/data/evermemos.log
+tail -f $(ls -t logs/evermemos_*.log | head -1)
 ```
 
 Common issues:
@@ -371,13 +371,13 @@ Common issues:
 **Force stop:**
 ```bash
 # Find PID
-cat data/evermemos.pid
+cat logs/evermemos.pid
 
 # Kill process
 kill -9 <PID>
 
 # Clean up PID file
-rm data/evermemos.pid
+rm logs/evermemos.pid
 ```
 
 ## Advanced Options

@@ -84,7 +84,7 @@ if [ "$KV_STARTED" = true ]; then
     fi
 fi
 
-# ── Step 2b: Wait for Docker services ready (MongoDB 27017 + Elasticsearch 9200) ─
+# ── Step 2b: Wait for Docker services ready (MongoDB 27017 + Elasticsearch 19200) ─
 echo ""
 echo "  ⏳ Waiting for Docker services to be ready..."
 TIMEOUT=180  # 3 minutes max (ES cold-start after volume wipe can be slow)
@@ -95,16 +95,21 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     ES_OK=false
 
     (echo > /dev/tcp/localhost/27017) 2>/dev/null && MONGO_OK=true
-    (echo > /dev/tcp/localhost/19200) 2>/dev/null && ES_OK=true
+    # Use ES cluster health API instead of TCP check: port open ≠ ES ready.
+    # wait_for_status=yellow ensures all primary shards are allocated before returning.
+    # Must check "timed_out":false in the response body — ES always returns HTTP 200
+    # even on timeout, so curl exit code alone is not sufficient.
+    ES_RESP=$(curl -sf "http://localhost:19200/_cluster/health?wait_for_status=yellow&timeout=3s" 2>/dev/null)
+    echo "$ES_RESP" | grep -q '"timed_out":false' && ES_OK=true
 
     if [ "$MONGO_OK" = true ] && [ "$ES_OK" = true ]; then
         echo "  ✅ MongoDB ready (port 27017)"
-        echo "  ✅ Elasticsearch ready (port 19200)"
+        echo "  ✅ Elasticsearch ready (cluster health: yellow)"
         break
     fi
 
-    [ "$MONGO_OK" = false ] && echo "  ⏳ Waiting for MongoDB (27017)..."    || true
-    [ "$ES_OK"    = false ] && echo "  ⏳ Waiting for Elasticsearch (19200)..." || true
+    [ "$MONGO_OK" = false ] && echo "  ⏳ Waiting for MongoDB (27017)..."           || true
+    [ "$ES_OK"    = false ] && echo "  ⏳ Waiting for Elasticsearch (cluster health)..." || true
 
     sleep 3
     ELAPSED=$((ELAPSED + 3))
@@ -127,7 +132,7 @@ echo "============================================================"
 echo "  ✅ EverMemOS is ready!"
 echo ""
 echo "  API:      http://localhost:1995"
-echo "  Logs:     data/evermemos.log"
+echo "  Logs:     logs/evermemos_<timestamp>.log"
 echo "  KV logs:  0g_kv_server/kv.log"
 echo "============================================================"
 echo ""
