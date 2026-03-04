@@ -14,21 +14,8 @@ import urllib.request
 import urllib.parse
 import urllib.error
 
-# Import project group_id helper (same directory)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-try:
-    from evermemos_config import get_project_group_id
-except ImportError:
-    def get_project_group_id(cwd=None):
-        explicit = os.environ.get('EVERMEMOS_GROUP_ID')
-        if explicit:
-            return explicit
-        target = cwd or os.getcwd()
-        try:
-            import pathlib
-            return f"project_{pathlib.Path(target).resolve()}"
-        except Exception:
-            return "project_default"
+from evermemos_config import get_project_group_id
 
 
 class EverMemOSClient:
