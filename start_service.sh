@@ -2,7 +2,8 @@
 # EverMemOS Service Starter
 #
 # Usage:
-#   ./start_service.sh
+#   ./start_service.sh            # first-time start after install (fresh stream ID)
+#   ./start_service.sh --restart  # subsequent starts (existing stream ID, must re-sync chain)
 #
 # What this does:
 #   1. Starts kv-server (zgs_kv) and Docker services in parallel
@@ -12,6 +13,12 @@
 # Prerequisites: run ./install.sh first
 
 set -e
+
+# ── Parse arguments ───────────────────────────────────────────────────────────
+RESTART=false
+for arg in "$@"; do
+    [ "$arg" = "--restart" ] && RESTART=true
+done
 
 # ── Resolve project root (works when called from any directory) ──────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -65,22 +72,63 @@ echo "  ✅ Docker containers started"
 # ── Step 2a: Wait for kv-server ready ────────────────────────────────────────
 if [ "$KV_STARTED" = true ]; then
     echo ""
-    echo "  ⏳ Waiting for kv-server to sync blockchain data..."
-    TIMEOUT=300  # 5 minutes max
-    ELAPSED=0
-
-    while [ $ELAPSED -lt $TIMEOUT ]; do
-        if grep -q "log sync to block number" "$KV_LOG" 2>/dev/null; then
-            echo "  ✅ kv-server synced and ready"
-            break
+    if [ "$RESTART" = false ]; then
+        # First-time start: fresh stream ID, nothing to sync from chain.
+        # Just confirm the process is alive.
+        sleep 2
+        if pgrep -f "zgs_kv" > /dev/null 2>&1; then
+            echo "  ✅ kv-server running (fresh stream, no chain sync needed)"
+        else
+            echo "  ⚠️  kv-server process not found after start, check logs: $KV_LOG"
         fi
-        sleep 3
-        ELAPSED=$((ELAPSED + 3))
-    done
+    else
+        # Restart with existing stream ID: kv-server must re-sync data from chain.
+        # Monitor only NEW log lines (skip pre-existing content).
+        # Success = same sequence number appears 10 consecutive times and is not 0.
+        # Pattern: "stream_replayer.*checking tx with sequence number <id>.."
+        echo "  ⏳ Waiting for kv-server to re-sync blockchain data (--restart mode)..."
+        echo "     (success = same sequence number stable for 10 consecutive log lines)"
 
-    if [ $ELAPSED -ge $TIMEOUT ]; then
-        echo "  ⚠️  kv-server did not confirm ready within ${TIMEOUT}s, proceeding anyway"
-        echo "     Check logs: $KV_LOG"
+        TIMEOUT=300  # 5 minutes max
+        ELAPSED=0
+        LOG_POS=$(wc -l < "$KV_LOG" 2>/dev/null || echo 0)
+        LAST_ID=""
+        CONSEC_COUNT=0
+        SYNC_OK=false
+
+        while [ $ELAPSED -lt $TIMEOUT ]; do
+            CURRENT_LINES=$(wc -l < "$KV_LOG" 2>/dev/null || echo 0)
+
+            if [ "$CURRENT_LINES" -gt "$LOG_POS" ]; then
+                while IFS= read -r line; do
+                    if echo "$line" | grep -qE "stream_replayer.*checking tx with sequence number [0-9]+\.\."; then
+                        ID=$(echo "$line" | grep -oE "sequence number [0-9]+" | grep -oE "[0-9]+$")
+                        if [ "$ID" = "$LAST_ID" ]; then
+                            CONSEC_COUNT=$((CONSEC_COUNT + 1))
+                        else
+                            LAST_ID="$ID"
+                            CONSEC_COUNT=1
+                        fi
+                        if [ "$CONSEC_COUNT" -ge 10 ] && [ "$ID" != "0" ]; then
+                            SYNC_OK=true
+                            break
+                        fi
+                    fi
+                done < <(sed -n "$((LOG_POS + 1)),${CURRENT_LINES}p" "$KV_LOG" 2>/dev/null)
+                LOG_POS=$CURRENT_LINES
+            fi
+
+            [ "$SYNC_OK" = true ] && break
+            sleep 3
+            ELAPSED=$((ELAPSED + 3))
+        done
+
+        if [ "$SYNC_OK" = true ]; then
+            echo "  ✅ kv-server re-synced (sequence number $LAST_ID stable)"
+        else
+            echo "  ⚠️  kv-server sync not confirmed within ${TIMEOUT}s, proceeding anyway"
+            echo "     Check logs: $KV_LOG"
+        fi
     fi
 fi
 

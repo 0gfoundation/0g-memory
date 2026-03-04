@@ -47,9 +47,17 @@ and place it at `0g_kv_server/zgs_kv`.
 
 ## Step 2 — Start
 
+**First time** (right after `install.sh`):
 ```bash
 ./start_service.sh
 ```
+
+**Subsequent starts** (after a `stop_service.sh`):
+```bash
+./start_service.sh --restart
+```
+
+The `--restart` flag tells the script that the kv-server has an existing stream ID and needs to re-sync data from the blockchain before the backend is ready. Without it, the script assumes a fresh stream and skips the sync wait.
 
 This starts:
 1. **kv-server** (`zgs_kv`) — 0G KV storage node, syncs blockchain
@@ -89,10 +97,11 @@ No extra commands needed.
 
 ```bash
 ./stop_service.sh
+./start_service.sh --restart
 ```
 
 Stops the backend, Docker containers, and kv-server.
-**All stored data is preserved.** Running `./start_service.sh` again resumes from where you left off.
+**All stored data is preserved.** The `--restart` flag is required on resume so the script waits for the kv-server to finish re-syncing the existing stream from the blockchain.
 
 ---
 
@@ -145,10 +154,10 @@ grep "sender_name=Claude (Tool)"    "$LOG" | wc -l
 ```
 install.sh
   └─ fill in .env
-       └─ start_service.sh
+       └─ start_service.sh                   ← first time (fresh stream)
             └─ use Claude Code normally
-                 └─ stop_service.sh      ← data preserved
-                      └─ start_service.sh ← resume, history still available
+                 └─ stop_service.sh           ← data preserved
+                      └─ start_service.sh --restart  ← resume (re-sync chain)
                            └─ ...
                                 └─ uninstall.sh  ← removes everything
 ```
