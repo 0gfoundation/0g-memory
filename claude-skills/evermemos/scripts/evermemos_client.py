@@ -14,6 +14,22 @@ import urllib.request
 import urllib.parse
 import urllib.error
 
+# Import project group_id helper (same directory)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from evermemos_config import get_project_group_id
+except ImportError:
+    def get_project_group_id(cwd=None):
+        explicit = os.environ.get('EVERMEMOS_GROUP_ID')
+        if explicit:
+            return explicit
+        target = cwd or os.getcwd()
+        try:
+            import pathlib
+            return f"project_{pathlib.Path(target).resolve()}"
+        except Exception:
+            return "project_default"
+
 
 class EverMemOSClient:
     """Client for interacting with EverMemOS API"""
@@ -275,11 +291,11 @@ Examples:
         )
         sys.exit(1)
 
-    # Initialize client
+    # Initialize client, derive group_id from cwd if not explicitly set
     client = EverMemOSClient(
         base_url=os.environ.get("EVERMEMOS_BASE_URL", "http://localhost:1995"),
         user_id=os.environ.get("EVERMEMOS_USER_ID", "claude_code_user"),
-        group_id=os.environ.get("EVERMEMOS_GROUP_ID", "session_2026"),
+        group_id=get_project_group_id(cwd=os.getcwd()),
     )
 
     command = sys.argv[1].lower()

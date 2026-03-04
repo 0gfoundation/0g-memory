@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
     from evermemos_client import EverMemOSClient
+    from evermemos_config import get_project_group_id
     from evermemos_logger import get_logger
 except ImportError as e:
     # If import fails, print error and exit gracefully
@@ -45,7 +46,6 @@ def get_env_config():
     return {
         'base_url': os.environ.get('EVERMEMOS_BASE_URL', 'http://localhost:1995'),
         'user_id': os.environ.get('EVERMEMOS_USER_ID', 'claude_code_user'),
-        'group_id': os.environ.get('EVERMEMOS_GROUP_ID', 'session_2026'),
     }
 
 
@@ -85,6 +85,22 @@ def format_context_for_claude(memories, pending_messages):
     return "\n".join(lines)
 
 
+def read_hook_input():
+    """Read cwd from Claude Code hook input"""
+    hook_input_env = os.environ.get('CLAUDE_HOOK_INPUT')
+    if hook_input_env:
+        try:
+            return json.loads(hook_input_env)
+        except json.JSONDecodeError:
+            pass
+    if not sys.stdin.isatty():
+        try:
+            return json.load(sys.stdin)
+        except json.JSONDecodeError:
+            pass
+    return {'cwd': os.environ.get('CLAUDE_CWD', os.getcwd())}
+
+
 def main():
     """Main execution"""
     if not _is_service_available():
@@ -92,8 +108,12 @@ def main():
         sys.exit(0)
 
     try:
-        # Get configuration
+        # Read cwd from hook input, derive group_id from project directory
+        hook_data = read_hook_input()
+        cwd = hook_data.get('cwd', os.getcwd())
+
         config = get_env_config()
+        config['group_id'] = get_project_group_id(cwd=cwd)
         client = EverMemOSClient(**config)
 
         # Fetch recent episodic memories (increased from 10 to 50 for richer context)

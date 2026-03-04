@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
     from evermemos_client import EverMemOSClient
-    from evermemos_config import is_project_excluded
+    from evermemos_config import is_project_excluded, get_project_group_id
     from evermemos_logger import get_logger
 except ImportError as e:
     # If import fails, exit gracefully
@@ -81,7 +81,6 @@ def get_env_config():
     return {
         'base_url': os.environ.get('EVERMEMOS_BASE_URL', 'http://localhost:1995'),
         'user_id': os.environ.get('EVERMEMOS_USER_ID', 'claude_code_user'),
-        'group_id': os.environ.get('EVERMEMOS_GROUP_ID', 'session_2026'),
     }
 
 
@@ -118,11 +117,7 @@ def main():
 
         # Get configuration
         config = get_env_config()
-
-        # Use session_id as group_id to organize memories by session
-        # If user has set EVERMEMOS_GROUP_ID explicitly, respect it
-        if os.environ.get('EVERMEMOS_GROUP_ID') is None:
-            config['group_id'] = f"session_{session_id}"
+        config['group_id'] = get_project_group_id(cwd=cwd)
 
         logger.debug(f"Using config: {config}")
 

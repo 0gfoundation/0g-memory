@@ -327,7 +327,10 @@ The skill uses environment variables (can be set in Claude Code settings or shel
 ```bash
 export EVERMEMOS_BASE_URL="http://localhost:1995"      # API endpoint
 export EVERMEMOS_USER_ID="claude_code_user"            # User identifier
-export EVERMEMOS_GROUP_ID="session_2026"               # Session/project identifier
+# EVERMEMOS_GROUP_ID is auto-derived from the current working directory:
+#   Format: project_<full_path>  e.g. project_/home/op/git/EverMemOS
+# Override only when you need to force a specific group:
+# export EVERMEMOS_GROUP_ID="project_/some/specific/path"
 ```
 
 ---
@@ -477,17 +480,22 @@ Then synthesize all results to provide comprehensive answer.
 
 ---
 
-### Session-Specific Groups
+### Project-Based Isolation (Automatic)
 
-Change `GROUP_ID` to organize memories by project or session:
+`group_id` is **automatically derived** from the current working directory (full path):
 
-```bash
-export EVERMEMOS_GROUP_ID="project_alpha"     # For project Alpha
-export EVERMEMOS_GROUP_ID="bugfix_session"    # For bug fixing session
-export EVERMEMOS_GROUP_ID="feature_dev"       # For feature development
+```
+Working in /home/op/git/EverMemOS  →  group_id = project_/home/op/git/EverMemOS
+Working in /home/op/git/MyApp      →  group_id = project_/home/op/git/MyApp
 ```
 
-This allows context isolation between different work streams.
+Each project's memories are fully isolated. No manual configuration needed.
+
+To override (force a specific group):
+
+```bash
+export EVERMEMOS_GROUP_ID="project_/some/specific/path"
+```
 
 ---
 
