@@ -7,9 +7,8 @@
 # What this does (reverse order of install.sh):
 #   0. Stops EverMemOS backend and kv-server (if running)
 #   0b. Removes Docker containers AND volumes (docker-compose down -v)
-#   9. Deletes 0g_kv_server/config_testnet_turbo.toml
-#   8. Deletes .0g_secrets
-#   7. Uninstalls 0G Storage SDK from uv venv
+#   8. Deletes 0g_kv_server/config_testnet_turbo.toml
+#   7. Deletes .0g_secrets
 #   6b. Removes EverMemOS hooks and env vars from ~/.claude/settings.json
 #   6a. Removes EverMemOS skills from ~/.claude/skills/
 #   5b. Deletes runtime files in logs/ (evermemos_*.log, evermemos.pid)
@@ -84,7 +83,7 @@ for target in "$KV_DIR/zgs_kv" "$KV_DIR/config_testnet_turbo.toml" "$KV_DIR/db" 
     fi
 done
 
-# ── Step 8 (reverse): Delete .0g_secrets ─────────────────────────────────────
+# ── Step 7 (reverse): Delete .0g_secrets ─────────────────────────────────────
 echo ""
 echo "▶  Removing .0g_secrets..."
 if [ -f "$SCRIPT_DIR/.0g_secrets" ]; then
@@ -92,16 +91,6 @@ if [ -f "$SCRIPT_DIR/.0g_secrets" ]; then
     echo "  ✅ Deleted .0g_secrets"
 else
     echo "  ℹ️  .0g_secrets not found, skipping"
-fi
-
-# ── Step 7 (reverse): Uninstall 0G Storage SDK from uv venv ──────────────────
-echo ""
-echo "▶  Uninstalling 0G Storage SDK..."
-if uv pip show zg-storage &>/dev/null 2>&1; then
-    uv pip uninstall zg-storage
-    echo "  ✅ Uninstalled zg-storage"
-else
-    echo "  ℹ️  zg-storage not installed, skipping"
 fi
 
 # ── Step 6b (reverse): Remove hooks and env vars from ~/.claude/settings.json ─

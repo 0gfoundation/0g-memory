@@ -11,9 +11,8 @@
 #   3. Installs Python dependencies (uv sync)
 #   4. Verifies Docker is installed, creates .env and data/
 #   5. Copies EverMemOS skills to ~/.claude/skills/ and merges hooks into ~/.claude/settings.json
-#   6. Installs 0G Storage SDK into uv venv
-#   7. Generates .0g_secrets (stream_id + encryption_key)
-#   8. Writes stream_id + encryption_key into kv-server config
+#   6. Generates .0g_secrets (stream_id + encryption_key)
+#   7. Writes stream_id + encryption_key into kv-server config
 #
 # To start services after installation, run: ./start_service.sh
 
@@ -52,22 +51,7 @@ echo "▶  Running setup..."
 echo ""
 python3 claude-skills/evermemos-setup/scripts/setup.py "$@"
 
-# ── Step 6: Install 0G Storage SDK into uv venv ──────────────────────────────
-echo ""
-echo "▶  Installing 0G Storage SDK..."
-echo ""
-
-ZG_SDK_DIR="$SCRIPT_DIR/../0g-storage-sdk-python"
-
-if [ ! -d "$ZG_SDK_DIR" ]; then
-    echo "  ⚠️  0G Storage SDK not found at $ZG_SDK_DIR, skipping"
-    echo "     Clone it first: git clone https://github.com/0glabs/0g-storage-sdk-python ../0g-storage-sdk-python"
-else
-    uv pip install -e "$ZG_SDK_DIR"
-    echo "  ✅ 0G Storage SDK installed"
-fi
-
-# ── Step 7: Generate .0g_secrets (stream_id + encryption_key) ───────────────
+# ── Step 6: Generate .0g_secrets (stream_id + encryption_key) ───────────────
 echo ""
 echo "▶  Generating 0G secrets (.0g_secrets)..."
 echo ""
@@ -107,7 +91,7 @@ if changed:
     print("  💾 Saved to .0g_secrets")
 EOF
 
-# ── Step 8: Write stream_id + encryption_key into kv-server config ───────────
+# ── Step 7: Write stream_id + encryption_key into kv-server config ───────────
 echo ""
 echo "▶  Updating kv-server config (config_testnet_turbo.toml)..."
 echo ""
