@@ -56,29 +56,28 @@ def format_context_for_claude(memories, pending_messages):
 
     lines = ["# 📚 Recent Memory Context\n"]
 
-    # Add recent episodic memories (increased display from 5 to 15)
+    # Add recent episodic memories
     if memories:
         lines.append("## Recent Conversations:\n")
         for mem in memories[:15]:  # Last 15 memories for richer context
             # Use priority: timestamp > start_time > created_at (all UTC)
             timestamp = mem.get('timestamp') or mem.get('start_time') or mem.get('created_at', 'Unknown time')
             title = mem.get('title', mem.get('subject', 'Untitled'))
-            summary = mem.get('summary', '')
+            full_text = mem.get('episode', '') or mem.get('summary', '')
 
             lines.append(f"**[{timestamp}]** {title}")
-            if summary:
-                lines.append(f"  {summary}\n")
+            if full_text:
+                lines.append(f"  {full_text}\n")
 
     # Add pending messages (not yet extracted into episodic memories)
-    # Increased display from 3 to 10 for better context
     if pending_messages:
         lines.append("## Recent Messages (Pending):\n")
-        for msg in pending_messages[:10]:  # Last 10 pending
+        for msg in pending_messages[:100]:  # Last 100 pending
             timestamp = msg.get('message_create_time', msg.get('created_at', 'Unknown time'))
             content = msg.get('content', '')
             # Truncate long content
-            if len(content) > 200:
-                content = content[:200] + "..."
+            if len(content) > 1000:
+                content = content[:1000] + "..."
             lines.append(f"**[{timestamp}]** {content}\n")
 
     lines.append("\n---\n")
