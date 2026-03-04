@@ -162,10 +162,12 @@ class MemoryController(BaseController):
         try:
             # 1. Get JSON body from request (simple direct format)
             message_data = await request.json()
+            _content = message_data.get("content", "")
             logger.info(
-                "Received memorize request (single message): sender_name=%s, role=%s",
+                "Received memorize request (single message): sender_name=%s, role=%s, content=%s",
                 message_data.get("sender_name"),
                 message_data.get("role"),
+                _content,
             )
 
             # 2. Convert directly to MemorizeRequest (unified single-step conversion)
@@ -491,6 +493,25 @@ class MemoryController(BaseController):
                 query_params.get("user_id"),
                 group_count,
             )
+            if response.memories:
+                for i, group in enumerate(response.memories):
+                    for mem_type, mems in group.items():
+                        for mem in mems:
+                            _summary = getattr(mem, "summary", None) or ""
+                            logger.info(
+                                "Search result [group=%d, type=%s]: summary=%s",
+                                i,
+                                mem_type,
+                                _summary,
+                            )
+            if response.pending_messages:
+                for msg in response.pending_messages:
+                    _c = msg.content or ""
+                    logger.info(
+                        "Search result [pending, sender=%s]: content=%s",
+                        msg.sender_name,
+                        _c,
+                    )
             return {
                 "status": ErrorStatus.OK.value,
                 "message": f"Memory search successful, retrieved {group_count} groups",
