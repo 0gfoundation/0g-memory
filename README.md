@@ -128,7 +128,7 @@ Specifically removes:
 | What | Command |
 |---|---|
 | EverMemOS backend | `tail -f $(ls -t logs/evermemos_*.log | head -1)` |
-| kv-server | `tail -f 0g_kv_server/kv.log` |
+| kv-server | `tail -f $(ls -t 0g_kv_server/kv_*.log \| head -1)` |
 | Hook activity | `tail -f ~/.claude/logs/hook_user_prompt.log` |
 
 Quick health check across all components:

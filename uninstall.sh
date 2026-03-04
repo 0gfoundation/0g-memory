@@ -82,6 +82,14 @@ for target in "$KV_DIR/zgs_kv" "$KV_DIR/config_testnet_turbo.toml" "$KV_DIR/db" 
         echo "  ℹ️  $target not found, skipping"
     fi
 done
+kv_log_count=0
+for f in "$KV_DIR"/kv_*.log; do
+    [ -f "$f" ] || continue
+    rm "$f"
+    echo "  ✅ Deleted $f"
+    kv_log_count=$((kv_log_count + 1))
+done
+[ "$kv_log_count" -eq 0 ] && echo "  ℹ️  No kv log files found, skipping"
 
 # ── Step 7 (reverse): Delete .0g_secrets ─────────────────────────────────────
 echo ""

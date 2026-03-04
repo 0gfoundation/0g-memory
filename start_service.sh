@@ -43,7 +43,8 @@ echo ""
 
 KV_BIN="$SCRIPT_DIR/0g_kv_server/zgs_kv"
 KV_RUN_DIR="$SCRIPT_DIR/0g_kv_server"
-KV_LOG="$KV_RUN_DIR/kv.log"
+KV_TS=$(date -u +"%Y%m%d_%H%M%S")
+KV_LOG="$KV_RUN_DIR/kv_${KV_TS}.log"
 KV_STARTED=false
 
 if pgrep -f "zgs_kv" > /dev/null 2>&1; then
@@ -53,7 +54,7 @@ elif [ ! -f "$KV_BIN" ]; then
 else
     echo "  🚀 Starting kv-server in background..."
     cd "$KV_RUN_DIR"
-    nohup "$KV_BIN" --config config_testnet_turbo.toml >> kv.log 2>&1 &
+    nohup "$KV_BIN" --config config_testnet_turbo.toml >> "kv_${KV_TS}.log" 2>&1 &
     KV_PID=$!
     cd "$SCRIPT_DIR"
     echo "  ✅ kv-server started (PID: $KV_PID), logs: $KV_LOG"
@@ -176,6 +177,6 @@ echo "  ✅ EverMemOS is ready!"
 echo ""
 echo "  API:      http://localhost:1995"
 echo "  Logs:     logs/evermemos_<timestamp>.log"
-echo "  KV logs:  0g_kv_server/kv.log"
+echo "  KV logs:  0g_kv_server/kv_${KV_TS}.log"
 echo "============================================================"
 echo ""
