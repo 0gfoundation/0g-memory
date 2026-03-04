@@ -73,7 +73,7 @@ dependencies = [
     "tiktoken>=0.12.0",
     "prometheus-client>=0.20.0",
     # 0G Storage SDK
-    "zg-storage",
+    "zg-storage>=0.2.0",
 ]
 
 [build-system]
