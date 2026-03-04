@@ -160,87 +160,6 @@ def format_tool_observation(tool_name, tool_input, tool_response):
     return "\n".join(lines)
 
 
-def find_transcript_path(session_id):
-    """
-    Find transcript file path for given session_id
-
-    Args:
-        session_id: Session identifier
-
-    Returns:
-        str: Path to transcript file, or None if not found
-    """
-    try:
-        # Transcript files are typically in ~/.claude/projects/<project>/<session_id>.jsonl
-        project_dir = os.environ.get('CLAUDE_PROJECT_DIR')
-        if not project_dir:
-            return None
-
-        # Look for transcript file
-        claude_dir = os.path.expanduser('~/.claude/projects')
-
-        # Try to find by session_id
-        for root, dirs, files in os.walk(claude_dir):
-            for file in files:
-                if file.startswith(session_id) and file.endswith('.jsonl'):
-                    return os.path.join(root, file)
-
-        return None
-    except Exception as e:
-        logger.warning(f"Failed to find transcript: {e}")
-        return None
-
-
-def extract_last_assistant_message_from_transcript(transcript_path):
-    """
-    Extract last assistant message with text content
-    (Simplified version without system-reminder stripping for tool hook)
-    """
-    if not transcript_path or not os.path.exists(transcript_path):
-        return None
-
-    try:
-        with open(transcript_path, 'r', encoding='utf-8') as f:
-            content = f.read().strip()
-
-        if not content:
-            return None
-
-        lines = content.split('\n')
-
-        # Iterate from last to first
-        for line in reversed(lines):
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-
-            if entry.get('type') != 'assistant':
-                continue
-
-            msg_content = entry.get('message', {}).get('content')
-            if not msg_content:
-                continue
-
-            text = ''
-            if isinstance(msg_content, str):
-                text = msg_content
-            elif isinstance(msg_content, list):
-                text_parts = []
-                for item in msg_content:
-                    if isinstance(item, dict) and item.get('type') == 'text':
-                        text_parts.append(item.get('text', ''))
-                text = '\n'.join(text_parts)
-
-            if text and text.strip():
-                return text.strip()
-
-        return None
-    except Exception as e:
-        logger.warning(f"Failed to extract message: {e}")
-        return None
-
-
 def main():
     """Main execution"""
     if not _is_service_available():
@@ -257,11 +176,10 @@ def main():
         tool_input = hook_data.get('tool_input') or hook_data.get('toolInput', '')
         tool_response = hook_data.get('tool_response') or hook_data.get('toolResponse', '')
         cwd = hook_data.get('cwd', '')
-        transcript_path = hook_data.get('transcript_path')  # May not be provided
 
         # Debug: log received data
         logger.debug(f"PostToolUse: sessionId={session_id}, tool={tool_name}, cwd={cwd}")
-        logger.info(f"Hook data keys: {list(hook_data.keys())}, transcript_path={bool(transcript_path)}")
+        logger.info(f"Hook data keys: {list(hook_data.keys())}")
 
         # Skip if no tool name (matches claude-mem validation)
         if not tool_name:
@@ -303,35 +221,6 @@ def main():
 
         # Log success
         logger.debug(f"Tool observation stored successfully: {result.get('message', 'OK')}")
-
-        # OPTION 2: Also try to extract and store assistant's text response
-        # This provides a backup mechanism if Stop hook misses some responses
-        logger.debug("Attempting to extract assistant response...")
-
-        if not transcript_path:
-            transcript_path = find_transcript_path(session_id)
-            logger.debug(f"Found transcript path: {transcript_path}")
-
-        if transcript_path:
-            import time
-            time.sleep(0.3)  # Small delay to let transcript flush
-
-            assistant_message = extract_last_assistant_message_from_transcript(transcript_path)
-
-            if assistant_message and len(assistant_message) > 20:  # Only store substantial messages
-                logger.debug(f"Found assistant message ({len(assistant_message)} chars):\n{'='*60}\n{assistant_message}\n{'='*60}")
-
-                # Store assistant's response
-                result = client.store_message(
-                    content=assistant_message,
-                    role="user",
-                    sender_name="Claude (Response)"
-                )
-                logger.info(f"Assistant response stored via PostToolUse: {result.get('message', 'OK')}")
-            else:
-                logger.debug("No substantial assistant message found")
-        else:
-            logger.debug("No transcript path available")
 
         # Return success
         output = {"continue": True, "suppressOutput": True}
