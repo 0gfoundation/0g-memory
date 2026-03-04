@@ -86,17 +86,17 @@ if [ "$KV_STARTED" = true ]; then
         # Monitor only NEW log lines (skip pre-existing content).
         # Success = same sequence number appears 10 consecutive times and is not 0.
         # Pattern: "stream_replayer.*checking tx with sequence number <id>.."
+        # No timeout — a large stream can take a long time to re-sync; wait as long as needed.
         echo "  ⏳ Waiting for kv-server to re-sync blockchain data (--restart mode)..."
         echo "     (success = same sequence number stable for 10 consecutive log lines)"
+        echo "     Press Ctrl+C to abort."
 
-        TIMEOUT=300  # 5 minutes max
-        ELAPSED=0
         LOG_POS=$(wc -l < "$KV_LOG" 2>/dev/null || echo 0)
         LAST_ID=""
         CONSEC_COUNT=0
         SYNC_OK=false
 
-        while [ $ELAPSED -lt $TIMEOUT ]; do
+        while true; do
             CURRENT_LINES=$(wc -l < "$KV_LOG" 2>/dev/null || echo 0)
 
             if [ "$CURRENT_LINES" -gt "$LOG_POS" ]; then
@@ -120,15 +120,9 @@ if [ "$KV_STARTED" = true ]; then
 
             [ "$SYNC_OK" = true ] && break
             sleep 3
-            ELAPSED=$((ELAPSED + 3))
         done
 
-        if [ "$SYNC_OK" = true ]; then
-            echo "  ✅ kv-server re-synced (sequence number $LAST_ID stable)"
-        else
-            echo "  ⚠️  kv-server sync not confirmed within ${TIMEOUT}s, proceeding anyway"
-            echo "     Check logs: $KV_LOG"
-        fi
+        echo "  ✅ kv-server re-synced (sequence number $LAST_ID stable)"
     fi
 fi
 
@@ -142,13 +136,14 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     MONGO_OK=false
     ES_OK=false
 
-    (echo > /dev/tcp/localhost/27017) 2>/dev/null && MONGO_OK=true
+    (echo > /dev/tcp/localhost/27017) 2>/dev/null && MONGO_OK=true || true
     # Use ES cluster health API instead of TCP check: port open ≠ ES ready.
     # wait_for_status=yellow ensures all primary shards are allocated before returning.
     # Must check "timed_out":false in the response body — ES always returns HTTP 200
     # even on timeout, so curl exit code alone is not sufficient.
-    ES_RESP=$(curl -sf "http://localhost:19200/_cluster/health?wait_for_status=yellow&timeout=3s" 2>/dev/null)
-    echo "$ES_RESP" | grep -q '"timed_out":false' && ES_OK=true
+    # || true on each line prevents set -e from killing the script when services aren't ready yet.
+    ES_RESP=$(curl -sf "http://localhost:19200/_cluster/health?wait_for_status=yellow&timeout=3s" 2>/dev/null) || true
+    echo "$ES_RESP" | grep -q '"timed_out":false' && ES_OK=true || true
 
     if [ "$MONGO_OK" = true ] && [ "$ES_OK" = true ]; then
         echo "  ✅ MongoDB ready (port 27017)"
