@@ -25,7 +25,7 @@ class EverMemOSClient:
         self,
         base_url: str = "http://localhost:1995",
         user_id: str = "claude_code_user",
-        group_id: str = "session_2026",
+        group_id: str = "project_default",
     ):
         self.base_url = base_url.rstrip("/")
         self.user_id = user_id
@@ -267,7 +267,7 @@ Commands:
 Environment Variables:
   EVERMEMOS_BASE_URL - API base URL (default: http://localhost:1995)
   EVERMEMOS_USER_ID  - User ID (default: claude_code_user)
-  EVERMEMOS_GROUP_ID - Group/session ID (default: session_2026)
+  EVERMEMOS_GROUP_ID - Override group ID (auto-derived from cwd by default)
 
 Examples:
   evermemos_client.py search "API design patterns"

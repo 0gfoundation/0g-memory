@@ -163,7 +163,7 @@ Skills 使用环境变量配置（可选）：
 ```bash
 export EVERMEMOS_BASE_URL="http://localhost:1995"
 export EVERMEMOS_USER_ID="your_username"
-export EVERMEMOS_GROUP_ID="your_project_name"
+# EVERMEMOS_GROUP_ID 无需手动设置，自动从当前工作目录派生（按项目隔离）
 ```
 
 ## 🔄 更新 Skills

@@ -35,7 +35,7 @@ python3 ~/.claude/skills/evermemos/scripts/evermemos_client.py search "test" hyb
 ```bash
 export EVERMEMOS_BASE_URL="http://localhost:1995"
 export EVERMEMOS_USER_ID="your_username"
-export EVERMEMOS_GROUP_ID="your_project_name"
+# EVERMEMOS_GROUP_ID 无需手动设置，自动从当前工作目录派生（按项目隔离）
 ```
 
 然后重启终端或执行 `source ~/.bashrc`
