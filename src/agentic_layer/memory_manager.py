@@ -480,6 +480,7 @@ class MemoryManager:
         )
 
         try:
+            milvus_start = time.perf_counter()
             # Get parameters from Request
             logger.debug(
                 f"get_vector_search_results called with retrieve_mem_request: {retrieve_mem_request}"
