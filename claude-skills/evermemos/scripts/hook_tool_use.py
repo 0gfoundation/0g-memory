@@ -83,6 +83,10 @@ def get_env_config():
     }
 
 
+MAX_INPUT_LENGTH = 10000
+MAX_RESPONSE_LENGTH = 100000
+
+
 def truncate_text(text, max_length=500):
     """Truncate text to max_length characters"""
     if not text:
@@ -114,18 +118,18 @@ def format_tool_observation(tool_name, tool_input, tool_response):
         # Handle both dict and string formats
         if isinstance(tool_input, dict):
             input_str = json.dumps(tool_input, indent=2, ensure_ascii=False)
-            if len(input_str) > 500:
-                input_str = input_str[:500] + "..."
+            if len(input_str) > MAX_INPUT_LENGTH:
+                input_str = input_str[:MAX_INPUT_LENGTH] + "..."
         elif isinstance(tool_input, str):
             try:
                 input_obj = json.loads(tool_input)
                 input_str = json.dumps(input_obj, indent=2, ensure_ascii=False)
-                if len(input_str) > 500:
-                    input_str = input_str[:500] + "..."
+                if len(input_str) > MAX_INPUT_LENGTH:
+                    input_str = input_str[:MAX_INPUT_LENGTH] + "..."
             except:
-                input_str = truncate_text(tool_input, max_length=500)
+                input_str = truncate_text(tool_input, max_length=MAX_INPUT_LENGTH)
         else:
-            input_str = truncate_text(str(tool_input), max_length=500)
+            input_str = truncate_text(str(tool_input), max_length=MAX_INPUT_LENGTH)
         lines.append(input_str)
         lines.append("")
 
@@ -136,21 +140,21 @@ def format_tool_observation(tool_name, tool_input, tool_response):
         if isinstance(tool_response, dict):
             # For dict, extract stdout or convert to JSON
             if 'stdout' in tool_response:
-                response_str = truncate_text(tool_response['stdout'], max_length=1000)
+                response_str = truncate_text(tool_response['stdout'], max_length=MAX_RESPONSE_LENGTH)
             else:
                 response_str = json.dumps(tool_response, indent=2, ensure_ascii=False)
-                if len(response_str) > 1000:
-                    response_str = response_str[:1000] + "..."
+                if len(response_str) > MAX_RESPONSE_LENGTH:
+                    response_str = response_str[:MAX_RESPONSE_LENGTH] + "..."
         elif isinstance(tool_response, str):
             try:
                 response_obj = json.loads(tool_response)
                 response_str = json.dumps(response_obj, indent=2, ensure_ascii=False)
-                if len(response_str) > 1000:
-                    response_str = response_str[:1000] + "..."
+                if len(response_str) > MAX_RESPONSE_LENGTH:
+                    response_str = response_str[:MAX_RESPONSE_LENGTH] + "..."
             except:
-                response_str = truncate_text(tool_response, max_length=1000)
+                response_str = truncate_text(tool_response, max_length=MAX_RESPONSE_LENGTH)
         else:
-            response_str = truncate_text(str(tool_response), max_length=1000)
+            response_str = truncate_text(str(tool_response), max_length=MAX_RESPONSE_LENGTH)
         lines.append(response_str)
 
     return "\n".join(lines)
