@@ -87,12 +87,6 @@ def format_context_for_claude(memories, pending_messages):
 
 def read_hook_input():
     """Read cwd from Claude Code hook input"""
-    hook_input_env = os.environ.get('CLAUDE_HOOK_INPUT')
-    if hook_input_env:
-        try:
-            return json.loads(hook_input_env)
-        except json.JSONDecodeError:
-            pass
     if not sys.stdin.isatty():
         try:
             return json.load(sys.stdin)

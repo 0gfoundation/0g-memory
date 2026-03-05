@@ -47,15 +47,7 @@ def read_hook_input():
     - cwd: string (current working directory)
     - last_assistant_message: string (Claude's final response text)
     """
-    # Method 1: Try environment variable first
-    hook_input_env = os.environ.get('CLAUDE_HOOK_INPUT')
-    if hook_input_env:
-        try:
-            return json.loads(hook_input_env)
-        except json.JSONDecodeError:
-            pass
-
-    # Method 2: Try reading from stdin
+    # Read from stdin
     if not sys.stdin.isatty():
         try:
             return json.load(sys.stdin)
