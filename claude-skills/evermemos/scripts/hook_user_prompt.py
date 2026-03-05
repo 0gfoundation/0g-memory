@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
     from evermemos_client import EverMemOSClient
-    from evermemos_config import is_project_excluded, get_project_group_id
+    from evermemos_config import get_project_group_id
     from evermemos_logger import get_logger
 except ImportError as e:
     # If import fails, exit gracefully
@@ -92,13 +92,6 @@ def main():
 
         # Debug: log received data
         logger.debug(f"UserPrompt: platform={platform}, sessionId={session_id}, prompt_length={len(prompt)}, cwd={cwd}")
-
-        # Check if project is excluded from tracking (matches claude-mem behavior)
-        if is_project_excluded(cwd):
-            logger.debug(f"Project excluded from tracking: {cwd}")
-            output = {"continue": True, "suppressOutput": True}
-            print(json.dumps(output))
-            sys.exit(0)
 
         # Handle image-only prompts (matches claude-mem behavior)
         # Use placeholder to preserve session tracking instead of skipping

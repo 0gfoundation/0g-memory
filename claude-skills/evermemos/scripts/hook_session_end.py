@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
     from evermemos_client import EverMemOSClient
-    from evermemos_config import is_project_excluded, get_project_group_id
+    from evermemos_config import get_project_group_id
     from evermemos_logger import get_logger
 except ImportError as e:
     # If import fails, exit gracefully
@@ -185,11 +185,6 @@ def main():
         reason = hook_data.get('reason', 'other')
 
         logger.debug(f"SessionEnd: sessionId={session_id}, cwd={cwd}, reason={reason}")
-
-        if is_project_excluded(cwd):
-            logger.debug(f"Project excluded from tracking: {cwd}")
-            print(json.dumps({"continue": True, "suppressOutput": True}))
-            sys.exit(0)
 
         config = get_env_config()
         config['group_id'] = get_project_group_id(cwd=cwd)
