@@ -57,7 +57,7 @@ def read_hook_input():
     # Fallback: build from environment variables
     return {
         'session_id': os.environ.get('CLAUDE_SESSION_ID', 'unknown'),
-        'cwd': os.environ.get('CLAUDE_CWD', os.getcwd()),
+        'cwd': os.environ.get('CLAUDE_CWD', ''),
         'reason': os.environ.get('CLAUDE_SESSION_END_REASON', 'other'),
     }
 

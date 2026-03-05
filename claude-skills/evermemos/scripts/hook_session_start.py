@@ -92,7 +92,7 @@ def read_hook_input():
             return json.load(sys.stdin)
         except json.JSONDecodeError:
             pass
-    return {'cwd': os.environ.get('CLAUDE_CWD', os.getcwd())}
+    return {'cwd': os.environ.get('CLAUDE_CWD', '')}
 
 
 def main():
@@ -104,7 +104,7 @@ def main():
     try:
         # Read cwd from hook input, derive group_id from project directory
         hook_data = read_hook_input()
-        cwd = hook_data.get('cwd', os.getcwd())
+        cwd = hook_data.get('cwd', '')
 
         config = get_env_config()
         config['group_id'] = get_project_group_id(cwd=cwd)

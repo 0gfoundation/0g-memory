@@ -63,7 +63,7 @@ def read_hook_input():
     return {
         'session_id': os.environ.get('CLAUDE_SESSION_ID', 'unknown'),
         'prompt': os.environ.get('CLAUDE_USER_PROMPT', ''),
-        'cwd': os.environ.get('CLAUDE_CWD', os.getcwd()),
+        'cwd': os.environ.get('CLAUDE_CWD', ''),
     }
 
 

@@ -62,7 +62,7 @@ def read_hook_input():
         'toolName': os.environ.get('CLAUDE_TOOL_NAME', ''),
         'toolInput': os.environ.get('CLAUDE_TOOL_INPUT', ''),
         'toolResponse': os.environ.get('CLAUDE_TOOL_RESPONSE', ''),
-        'cwd': os.environ.get('CLAUDE_CWD', os.getcwd()),
+        'cwd': os.environ.get('CLAUDE_CWD', ''),
     }
 
 

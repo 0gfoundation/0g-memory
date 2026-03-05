@@ -17,8 +17,8 @@ def get_project_group_id(cwd: str = None) -> str:
 
     Priority:
     1. EVERMEMOS_GROUP_ID env var (explicit override)
-    2. cwd-derived full path
-    3. Fallback default
+    2. cwd-derived full path (must be explicitly passed by caller)
+    3. Fallback to "project_default" if cwd is missing or empty
     """
     # 1. Explicit env var override
     explicit = os.environ.get('EVERMEMOS_GROUP_ID')
@@ -26,9 +26,9 @@ def get_project_group_id(cwd: str = None) -> str:
         return explicit
 
     # 2. Derive from cwd (full resolved path)
-    if cwd is None:
-        cwd = os.getcwd()
-
+    # Note: do NOT fall back to os.getcwd() — hooks run in an unpredictable
+    # working directory (not the user's project dir), so os.getcwd() would
+    # produce a silently wrong group_id. Use "project_default" instead.
     if cwd:
         try:
             resolved = str(Path(cwd).resolve())
@@ -36,5 +36,5 @@ def get_project_group_id(cwd: str = None) -> str:
         except Exception as e:
             print(f"[WARNING] Failed to resolve cwd for group_id: {cwd}: {e}", file=sys.stderr)
 
-    # 3. Fallback
+    # 3. Fallback: cwd unknown, cannot determine project directory
     return "project_default"
