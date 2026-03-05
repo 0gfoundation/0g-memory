@@ -193,13 +193,7 @@ def main():
 
         summary = generate_session_summary(session_id, reason, client)
 
-        result = client.store_message(
-            content=summary,
-            role="user",
-            sender_name="System (Session Complete)"
-        )
-
-        logger.debug(f"Session summary stored successfully: {result.get('message', 'OK')}")
+        logger.info(f"Session summary:\n{summary}")
 
         print(json.dumps({"continue": True, "suppressOutput": True}))
         sys.exit(0)
