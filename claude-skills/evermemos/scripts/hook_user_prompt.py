@@ -101,7 +101,7 @@ def main():
 
         # Get configuration
         config = get_env_config()
-        config['group_id'] = get_project_group_id(cwd=cwd)
+        config['group_id'] = get_project_group_id(cwd=cwd, user_id=config['user_id'])
 
         logger.debug(f"Using config: {config}")
 

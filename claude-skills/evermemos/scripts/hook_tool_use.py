@@ -181,7 +181,7 @@ def main():
 
         # Get configuration
         config = get_env_config()
-        config['group_id'] = get_project_group_id(cwd=cwd)
+        config['group_id'] = get_project_group_id(cwd=cwd, user_id=config['user_id'])
 
         logger.debug(f"Using config: {config}")
 
@@ -192,11 +192,9 @@ def main():
 
         logger.debug(f"Storing tool observation to EverMemOS... (length: {len(observation_message)} chars)")
 
-        # Store as user message with special sender name to indicate tool usage
-        # Note: EverMemOS only includes role="user" messages in pending_messages
         result = client.store_message(
             content=observation_message,
-            role="user",
+            role="assistant",
             sender_name="Claude (Tool)"
         )
 

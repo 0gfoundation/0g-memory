@@ -187,7 +187,7 @@ def main():
         logger.debug(f"SessionEnd: sessionId={session_id}, cwd={cwd}, reason={reason}")
 
         config = get_env_config()
-        config['group_id'] = get_project_group_id(cwd=cwd)
+        config['group_id'] = get_project_group_id(cwd=cwd, user_id=config['user_id'])
 
         client = EverMemOSClient(**config)
 

@@ -126,7 +126,7 @@ class EverMemOSClient:
         data = {
             "message_id": message_id,
             "create_time": datetime.now().isoformat(),
-            "sender": self.user_id if role == "user" else "assistant",
+            "sender": self.user_id,
             "sender_name": sender_name,
             "content": content,
             "role": role,
@@ -283,10 +283,11 @@ Examples:
         sys.exit(1)
 
     # Initialize client, derive group_id from cwd if not explicitly set
+    user_id = os.environ.get("EVERMEMOS_USER_ID", "claude_code_user")
     client = EverMemOSClient(
         base_url=os.environ.get("EVERMEMOS_BASE_URL", "http://localhost:1995"),
-        user_id=os.environ.get("EVERMEMOS_USER_ID", "claude_code_user"),
-        group_id=get_project_group_id(cwd=os.getcwd()),
+        user_id=user_id,
+        group_id=get_project_group_id(cwd=os.getcwd(), user_id=user_id),
     )
 
     command = sys.argv[1].lower()

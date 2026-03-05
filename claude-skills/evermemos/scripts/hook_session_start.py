@@ -107,7 +107,7 @@ def main():
         cwd = hook_data.get('cwd', '')
 
         config = get_env_config()
-        config['group_id'] = get_project_group_id(cwd=cwd)
+        config['group_id'] = get_project_group_id(cwd=cwd, user_id=config['user_id'])
         client = EverMemOSClient(**config)
 
         # Fetch recent episodic memories (increased from 10 to 50 for richer context)

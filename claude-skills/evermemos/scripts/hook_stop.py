@@ -88,7 +88,7 @@ def main():
 
         # Get configuration
         config = get_env_config()
-        config['group_id'] = get_project_group_id(cwd=cwd)
+        config['group_id'] = get_project_group_id(cwd=cwd, user_id=config['user_id'])
 
         client = EverMemOSClient(**config)
 
@@ -100,7 +100,7 @@ def main():
         if claude_output:
             result = client.store_message(
                 content=claude_output,
-                role="user",
+                role="assistant",
                 sender_name="Claude (Response)"
             )
             logger.info(f"Claude output stored successfully: {result.get('message', 'OK')}")
