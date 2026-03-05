@@ -491,7 +491,7 @@ class MemoryManager:
                 )
             query = retrieve_mem_request.query
             if not query:
-                raise ValueError("query is required for retrieve_mem_vector")
+                return []
 
             user_id = retrieve_mem_request.user_id
             group_id = retrieve_mem_request.group_id
