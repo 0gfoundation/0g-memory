@@ -25,7 +25,7 @@ except ImportError as e:
             "hookEventName": "SessionStart",
             "additionalContext": ""
         }
-    }), file=sys.stderr)
+    }))
     sys.exit(0)
 
 # Global logger instance
