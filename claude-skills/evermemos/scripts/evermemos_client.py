@@ -16,6 +16,9 @@ import urllib.error
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from evermemos_config import get_project_group_id
+from evermemos_logger import get_logger
+
+logger = get_logger("evermemos_client")
 
 
 class EverMemOSClient:
@@ -95,6 +98,7 @@ class EverMemOSClient:
             "memory_types": memory_types,
         }
 
+        logger.debug(f"search_memories data: {data}")
         return self._make_request("GET", "/api/v1/memories/search", data=data)
 
     def store_message(
@@ -253,7 +257,7 @@ def format_recent_memories(response: Dict[str, Any], pending_response: Dict[str,
 def main():
     """Main CLI interface"""
     if len(sys.argv) < 2:
-        print(
+        logger.info(
             """Usage:
   evermemos_client.py search <query> [method] [top_k]
   evermemos_client.py store <content> [role]
@@ -290,40 +294,40 @@ Examples:
     try:
         if command == "search":
             if len(sys.argv) < 3:
-                print("❌ Error: Missing search query")
+                logger.error("❌ Error: Missing search query")
                 sys.exit(1)
 
             query = sys.argv[2]
             method = sys.argv[3] if len(sys.argv) > 3 else "hybrid"
             top_k = int(sys.argv[4]) if len(sys.argv) > 4 else 5
 
-            print(f"🔍 Searching memories for: '{query}'")
-            print(f"   Method: {method}, Top K: {top_k}\n")
+            logger.info(f"🔍 Searching memories for: '{query}'")
+            logger.info(f"   Method: {method}, Top K: {top_k}\n")
 
             response = client.search_memories(query, method, top_k)
-            print(format_search_results(response))
+            logger.info(format_search_results(response))
 
         elif command == "store":
             if len(sys.argv) < 3:
-                print("❌ Error: Missing message content")
+                logger.error("❌ Error: Missing message content")
                 sys.exit(1)
 
             content = sys.argv[2]
             role = sys.argv[3] if len(sys.argv) > 3 else "user"
 
-            print(f"💾 Storing message as '{role}'...")
+            logger.info(f"💾 Storing message as '{role}'...")
 
             response = client.store_message(content, role)
             result = response.get("result", {})
             count = result.get("count", 0)
 
-            print(f"✅ Message stored successfully")
-            print(f"   Extracted {count} memories")
+            logger.info(f"✅ Message stored successfully")
+            logger.info(f"   Extracted {count} memories")
 
         elif command == "recent":
             limit = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 
-            print(f"📜 Fetching {limit} recent memories...\n")
+            logger.info(f"📜 Fetching {limit} recent memories...\n")
 
             # Fetch recent episodic memories
             response = client.fetch_recent_memories(limit)
@@ -335,15 +339,15 @@ Examples:
             except:
                 pending_response = None  # If search fails, continue without pending
 
-            print(format_recent_memories(response, pending_response))
+            logger.info(format_recent_memories(response, pending_response))
 
         else:
-            print(f"❌ Unknown command: {command}")
-            print("   Valid commands: search, store, recent")
+            logger.error(f"❌ Unknown command: {command}")
+            logger.info("   Valid commands: search, store, recent")
             sys.exit(1)
 
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
+        logger.error(f"❌ Error: {str(e)}")
         sys.exit(1)
 
 

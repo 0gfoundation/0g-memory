@@ -131,6 +131,7 @@ def main():
 
         # Format context
         context = format_context_for_claude(memories, pending_messages)
+        logger.debug(f"Context for Claude:\n{context}")
 
         # Return hook output in Claude Code format
         output = {
