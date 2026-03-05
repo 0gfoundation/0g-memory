@@ -208,6 +208,7 @@ class EpisodicMemoryModel:
     extend: Optional[Dict[str, Any]] = None
     memcell_event_id_list: Optional[List[str]] = None
     subject: Optional[str] = None
+    episode: Optional[str] = None
 
 
 @dataclass

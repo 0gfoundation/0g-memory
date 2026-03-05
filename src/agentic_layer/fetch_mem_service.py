@@ -354,6 +354,7 @@ class FetchMemoryServiceImpl(FetchMemoryServiceInterface):
             created_at=episodic_memory.created_at,
             updated_at=episodic_memory.updated_at,
             metadata=metadata,
+            episode=episodic_memory.episode,
         )
 
     def _convert_behavior_history(self, behavior) -> BehaviorHistoryModel:
