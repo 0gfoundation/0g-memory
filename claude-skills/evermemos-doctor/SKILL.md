@@ -1,9 +1,9 @@
 ---
 name: evermemos-doctor
-description: Diagnose EverMemOS issues and check health. Use when user encounters problems, needs troubleshooting, or wants to verify installation.
+description: Manage and diagnose EverMemOS. Use for installation (install.sh), starting/stopping/restarting services (start_service.sh / stop_service.sh), checking service status, viewing logs, and health diagnostics. Trigger on any request to install, set up, start, stop, restart, check status, or troubleshoot EverMemOS.
 argument-hint: ""
 disable-model-invocation: false
-allowed-tools: Bash(python3 *), Read
+allowed-tools: Bash(python3 *), Bash(bash *), Bash(./install.sh*), Bash(./start_service.sh*), Bash(./stop_service.sh*), Bash(./uninstall.sh*), Read
 ---
 
 # EverMemOS Doctor - Health Check & Diagnostics
@@ -495,3 +495,95 @@ Doctor is satisfied when:
 ---
 
 The doctor is in! 🩺
+
+---
+
+## Service Management
+
+In addition to diagnostics, this skill handles all EverMemOS lifecycle operations.
+
+### Installation
+
+**Trigger when user says:**
+- "How do I install EverMemOS?"
+- "Set up EverMemOS" / "Install EverMemOS for me"
+- "Help me get EverMemOS running for the first time"
+
+**Action:** Run the installer from the project root:
+```bash
+bash ./install.sh
+```
+
+After install, remind the user to:
+1. Fill in API keys in `.env`
+2. Download `zgs_kv` binary if needed
+3. Run `./start_service.sh` to start services
+
+---
+
+### Start Services
+
+**Trigger when user says:**
+- "Start EverMemOS" / "启动 EverMemOS"
+- "Run EverMemOS" / "Launch the service"
+
+**Action (first-time start):**
+```bash
+bash ./start_service.sh
+```
+
+**Action (restart with existing stream ID):**
+```bash
+bash ./start_service.sh --restart
+```
+
+---
+
+### Stop Services
+
+**Trigger when user says:**
+- "Stop EverMemOS" / "关闭 EverMemOS" / "Shut down the service"
+
+**Action:**
+```bash
+bash ./stop_service.sh
+```
+
+---
+
+### Restart Services
+
+**Trigger when user says:**
+- "Restart EverMemOS" / "重启 EverMemOS"
+- "I just changed the config, apply it"
+
+**Action:**
+```bash
+bash ./stop_service.sh && bash ./start_service.sh --restart
+```
+
+---
+
+### Check Status
+
+**Trigger when user says:**
+- "Is EverMemOS running?" / "Check service status"
+- "EverMemOS 跑起来了吗？"
+
+**Action:**
+```bash
+python3 ~/.claude/skills/evermemos-start/scripts/service_manager.py status
+```
+
+---
+
+### View Logs
+
+**Trigger when user says:**
+- "Show me the logs" / "EverMemOS logs"
+- "What's in the log?"
+
+**Action:**
+```bash
+python3 ~/.claude/skills/evermemos-start/scripts/service_manager.py logs
+```
