@@ -55,15 +55,15 @@ class EverMemOSLogger:
         """Error level logging"""
         self._log('ERROR', message, to_file=True, to_stderr=True)
 
-# Singleton instance
-_logger = None
+# Per-name singleton instances
+_loggers = {}
 
 def get_logger(log_name="evermemos_hooks"):
-    """Get or create the global logger instance"""
-    global _logger
-    if _logger is None:
-        _logger = EverMemOSLogger(log_name)
-    return _logger
+    """Get or create a logger instance by name"""
+    global _loggers
+    if log_name not in _loggers:
+        _loggers[log_name] = EverMemOSLogger(log_name)
+    return _loggers[log_name]
 
 
 if __name__ == "__main__":
