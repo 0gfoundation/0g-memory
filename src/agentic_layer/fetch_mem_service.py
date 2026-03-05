@@ -342,6 +342,7 @@ class FetchMemoryServiceImpl(FetchMemoryServiceInterface):
             episode_id=str(episodic_memory.event_id),
             title=episodic_memory.subject,
             summary=episodic_memory.summary,
+            timestamp=episodic_memory.timestamp,
             participants=episodic_memory.participants or [],
             location=(
                 episodic_memory.extend.get("location", "")
