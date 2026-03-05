@@ -58,7 +58,7 @@ def read_hook_input():
         except json.JSONDecodeError:
             pass
 
-    # Method 3: Build from individual environment variables
+    # Fallback: build from environment variables
     # Claude Code may also pass data as separate env vars
     return {
         'session_id': os.environ.get('CLAUDE_SESSION_ID', 'unknown'),

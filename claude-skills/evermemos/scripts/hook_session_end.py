@@ -54,7 +54,7 @@ def read_hook_input():
         except json.JSONDecodeError:
             pass
 
-    # Method 3: Build from individual environment variables
+    # Fallback: build from environment variables
     return {
         'session_id': os.environ.get('CLAUDE_SESSION_ID', 'unknown'),
         'cwd': os.environ.get('CLAUDE_CWD', os.getcwd()),
