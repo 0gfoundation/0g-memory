@@ -46,10 +46,10 @@ def read_hook_input():
     2. stdin: JSON object
 
     Expected fields for UserPromptSubmit:
-    - sessionId: string
+    - session_id: string
     - prompt: string (user's input)
     - cwd: string (current working directory)
-    - platform: string (claude-code or cursor)
+    - hook_event_name: string
     """
     # Method 1: Try environment variable first
     hook_input_env = os.environ.get('CLAUDE_HOOK_INPUT')
@@ -69,10 +69,9 @@ def read_hook_input():
     # Method 3: Build from individual environment variables
     # Claude Code may also pass data as separate env vars
     return {
-        'sessionId': os.environ.get('CLAUDE_SESSION_ID', 'unknown'),
+        'session_id': os.environ.get('CLAUDE_SESSION_ID', 'unknown'),
         'prompt': os.environ.get('CLAUDE_USER_PROMPT', ''),
         'cwd': os.environ.get('CLAUDE_CWD', os.getcwd()),
-        'platform': os.environ.get('CLAUDE_PLATFORM', 'claude-code'),
     }
 
 
@@ -94,7 +93,7 @@ def main():
         # Read hook input
         hook_data = read_hook_input()
 
-        session_id = hook_data.get('sessionId', 'unknown')
+        session_id = hook_data.get('session_id', 'unknown')
         prompt = hook_data.get('prompt', '')
         cwd = hook_data.get('cwd', '')
         platform = hook_data.get('platform', 'claude-code')
