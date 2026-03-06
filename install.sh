@@ -50,7 +50,7 @@ echo "✅ Python $PYTHON_VERSION (uv will manage Python 3.12 for the application
 echo ""
 echo "▶  Running setup..."
 echo ""
-python3 claude-skills/evermemos-setup/scripts/setup.py "$@"
+python3 scripts/setup.py "$@"
 
 # ── Step 6: Generate .0g_secrets (stream_id + encryption_key) ───────────────
 echo ""

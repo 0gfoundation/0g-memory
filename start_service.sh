@@ -168,7 +168,7 @@ fi
 echo ""
 echo "▶  Starting EverMemOS backend..."
 echo ""
-python3 claude-skills/evermemos-start/scripts/service_manager.py start
+python3 scripts/service_manager.py start
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 echo ""

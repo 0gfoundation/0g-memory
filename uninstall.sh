@@ -39,7 +39,7 @@ echo "▶  Stopping running services..."
 echo ""
 
 # Stop EverMemOS backend
-python3 claude-skills/evermemos-start/scripts/service_manager.py stop 2>/dev/null || true
+python3 scripts/service_manager.py stop 2>/dev/null || true
 if pgrep -f "src/run.py" > /dev/null 2>&1; then
     pkill -TERM -f "src/run.py" 2>/dev/null || true
     sleep 2

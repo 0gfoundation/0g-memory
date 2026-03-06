@@ -30,7 +30,7 @@ echo ""
 # ── Step 1: Stop EverMemOS backend ───────────────────────────────────────────
 echo "▶  Stopping EverMemOS backend..."
 echo ""
-python3 claude-skills/evermemos-start/scripts/service_manager.py stop
+python3 scripts/service_manager.py stop
 
 # Fallback: service_manager relies on PID file; if it's missing but the process
 # is still running (e.g. started outside of service_manager), kill it directly.
