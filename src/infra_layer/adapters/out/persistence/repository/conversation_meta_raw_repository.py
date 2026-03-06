@@ -27,7 +27,7 @@ ALLOWED_SCENES = [e.value for e in ScenarioType]
 
 @repository("conversation_meta_raw_repository", primary=True)
 class ConversationMetaRawRepository(
-    DualStorageMixin,  # 添加双存储支持 - 自动拦截 MongoDB 调用
+    DualStorageMixin,  # Add dual storage support - automatically intercepts MongoDB calls
     BaseRepository[ConversationMeta],
 ):
     """

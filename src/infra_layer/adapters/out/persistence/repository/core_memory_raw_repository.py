@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 @repository("core_memory_raw_repository", primary=True)
 class CoreMemoryRawRepository(
-    DualStorageMixin,  # 添加双存储支持 - 自动拦截 MongoDB 调用
+    DualStorageMixin,  # Add dual storage support - automatically intercepts MongoDB calls
     BaseRepository[CoreMemory],
 ):
     """

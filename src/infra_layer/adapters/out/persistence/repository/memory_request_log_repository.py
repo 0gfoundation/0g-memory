@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 
 @repository("memory_request_log_repository", primary=True)
 class MemoryRequestLogRepository(
-    DualStorageMixin,  # 添加双存储支持 - 自动拦截 MongoDB 调用
+    DualStorageMixin,  # Add dual storage support - automatically intercepts MongoDB calls
     BaseRepository[MemoryRequestLog],
 ):
     """

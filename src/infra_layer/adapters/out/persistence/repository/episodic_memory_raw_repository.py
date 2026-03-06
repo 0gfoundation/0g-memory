@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 @repository("episodic_memory_raw_repository", primary=True)
 class EpisodicMemoryRawRepository(
-    DualStorageMixin,  # 添加双存储支持 - 自动拦截 MongoDB 调用
+    DualStorageMixin,  # Add dual storage support - automatically intercepts MongoDB calls
     BaseRepository[EpisodicMemory],
 ):
     """

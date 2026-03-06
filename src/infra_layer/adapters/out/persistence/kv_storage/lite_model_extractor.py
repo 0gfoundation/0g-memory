@@ -1,8 +1,8 @@
 """
-Lite Model Field Extractor - 运行时动态提取索引字段
+Lite Model Field Extractor - dynamically extracts indexed fields at runtime
 
-通过 Python 反射自动提取 Document 类的所有索引字段和查询字段，
-无需手动维护 Lite 类代码。当第三方修改索引后，自动适配。
+Automatically extracts all indexed and query fields from Document classes via Python reflection.
+No manual maintenance of Lite class code required. Adapts automatically when third parties modify indexes.
 """
 
 from typing import Type, Set, Any, Dict
@@ -20,63 +20,63 @@ class LiteModelExtractor:
     """
     Lite Model Field Extractor
 
-    运行时动态提取 Document 的索引字段和查询字段，构建 Lite 版本数据。
+    Dynamically extracts indexed and query fields from a Document at runtime to build Lite version data.
 
-    提取规则：
-    1. 所有 Indexed 标记的字段
-    2. Settings.indexes 中定义的索引字段
-    3. Settings.query_fields 中配置的查询字段（无索引但用于查询）
-    4. 审计字段：id, created_at, updated_at
-    5. 软删除字段：deleted_at, deleted_by, deleted_id（如果存在）
+    Extraction rules:
+    1. All fields marked with Indexed
+    2. Indexed fields defined in Settings.indexes
+    3. Query fields configured in Settings.query_fields (no index but used in queries)
+    4. Audit fields: id, created_at, updated_at
+    5. Soft-delete fields: deleted_at, deleted_by, deleted_id (if present)
 
-    注意：query_fields 用于那些没有建索引但在查询中使用的字段
+    Note: query_fields is for fields that have no index but are used in queries
     """
 
-    # 始终包含的系统字段
+    # System fields always included
     SYSTEM_FIELDS = {"id", "created_at", "updated_at", "revision_id"}
 
-    # 软删除字段（如果 Document 支持软删除）
+    # Soft-delete fields (if Document supports soft delete)
     SOFT_DELETE_FIELDS = {"deleted_at", "deleted_by", "deleted_id"}
 
     @classmethod
     def extract_indexed_fields(cls, document_class: Type[BaseModel]) -> Set[str]:
         """
-        提取 Document 类的所有索引字段和查询字段
+        Extract all indexed and query fields from a Document class
 
         Args:
-            document_class: Beanie Document 类
+            document_class: Beanie Document class
 
         Returns:
-            Set[str]: 索引字段 + 查询字段名称集合
+            Set[str]: set of indexed field names + query field names
         """
         indexed_fields = set()
 
-        # 1. 始终包含系统字段
+        # 1. Always include system fields
         indexed_fields.update(cls.SYSTEM_FIELDS)
 
-        # 2. 检查是否支持软删除（有 deleted_at 字段）
+        # 2. Check if soft delete is supported (has deleted_at field)
         if hasattr(document_class, "deleted_at"):
             indexed_fields.update(cls.SOFT_DELETE_FIELDS)
 
-        # 3. 从字段注解中提取 Indexed 字段
+        # 3. Extract Indexed fields from field annotations
         for field_name, field_info in document_class.model_fields.items():
-            # 检查是否是 Indexed 类型
+            # Check if this is an Indexed type
             if cls._is_indexed_field(field_info):
                 indexed_fields.add(field_name)
 
-        # 4. 从 Settings.indexes 中提取索引字段
+        # 4. Extract indexed fields from Settings.indexes
         if hasattr(document_class, "Settings") and hasattr(document_class.Settings, "indexes"):
             for index_model in document_class.Settings.indexes:
-                # IndexModel 的 document 属性返回完整索引规范（SON 对象）
-                # 需要从 'key' 字段中提取实际的字段名
+                # The document attribute of IndexModel returns the full index spec (SON object)
+                # Extract the actual field names from the 'key' entry
                 if hasattr(index_model, "document"):
                     index_spec = index_model.document
-                    # index_spec["key"] 是一个 SON 对象，包含 (field_name, direction) 对
+                    # index_spec["key"] is a SON object containing (field_name, direction) pairs
                     if "key" in index_spec:
                         for field_name in index_spec["key"].keys():
                             indexed_fields.add(field_name)
 
-        # 5. 从 Settings.query_fields 中提取查询字段（无索引但用于查询）
+        # 5. Extract query fields from Settings.query_fields (no index but used in queries)
         if hasattr(document_class, "Settings") and hasattr(document_class.Settings, "query_fields"):
             query_fields = document_class.Settings.query_fields
             if query_fields:
@@ -89,61 +89,61 @@ class LiteModelExtractor:
     @classmethod
     def _is_indexed_field(cls, field_info: FieldInfo) -> bool:
         """
-        检查字段是否是 Indexed 类型
+        Check whether a field is of Indexed type
 
         Args:
             field_info: Pydantic FieldInfo
 
         Returns:
-            bool: 是否是索引字段
+            bool: True if this is an indexed field
         """
-        # 检查 annotation 是否包含 Indexed
+        # Check whether the annotation contains Indexed
         annotation = field_info.annotation
 
-        # 处理 Optional[Indexed[...]] 的情况
+        # Handle Optional[Indexed[...]] case
         if hasattr(annotation, "__origin__"):
-            # 获取泛型参数
+            # Get generic arguments
             args = getattr(annotation, "__args__", ())
             for arg in args:
                 if cls._is_indexed_type(arg):
                     return True
 
-        # 直接检查是否是 Indexed 类型
+        # Directly check whether this is an Indexed type
         return cls._is_indexed_type(annotation)
 
     @classmethod
     def _is_indexed_type(cls, type_annotation: Any) -> bool:
         """
-        检查类型是否是 Indexed
+        Check whether a type is Indexed
 
         Args:
-            type_annotation: 类型注解
+            type_annotation: type annotation
 
         Returns:
-            bool: 是否是 Indexed 类型
+            bool: True if this is an Indexed type
         """
-        # 检查是否是 Indexed 泛型
+        # Check whether this is an Indexed generic
         if hasattr(type_annotation, "__origin__"):
             origin = type_annotation.__origin__
-            # Indexed 在 beanie 中的实现
+            # Indexed implementation in beanie
             if origin is not None and "Indexed" in str(origin):
                 return True
 
-        # 检查类型名称
+        # Check the type name
         type_str = str(type_annotation)
         return "Indexed" in type_str
 
     @classmethod
     def extract_lite_data(cls, document: BaseModel, indexed_fields: Set[str]) -> Dict[str, Any]:
         """
-        从完整 Document 提取 Lite 版本数据（只包含索引字段）
+        Extract Lite version data from a full Document (indexed fields only)
 
         Args:
-            document: 完整的 Document 实例
-            indexed_fields: 索引字段集合
+            document: full Document instance
+            indexed_fields: set of indexed fields
 
         Returns:
-            Dict[str, Any]: 只包含索引字段的字典
+            Dict[str, Any]: dict containing only indexed fields
         """
         # Exclude Beanie internal fields that might be ExpressionField objects
         # These fields should not be serialized before the document is inserted
@@ -177,19 +177,19 @@ class LiteModelExtractor:
     @classmethod
     def create_lite_document(cls, document: BaseModel, indexed_fields: Set[str]) -> BaseModel:
         """
-        创建 Lite 版本的 Document 实例（只包含索引字段）
+        Create a Lite version Document instance (indexed fields only)
 
         Args:
-            document: 完整的 Document 实例
-            indexed_fields: 索引字段集合
+            document: full Document instance
+            indexed_fields: set of indexed fields
 
         Returns:
-            BaseModel: Lite 版本的 Document 实例
+            BaseModel: Lite version Document instance
         """
         lite_data = cls.extract_lite_data(document, indexed_fields)
 
-        # 使用相同的 Document 类创建实例，但只包含索引字段
-        # Pydantic 会自动处理缺失的可选字段
+        # Use the same Document class to create an instance with only indexed fields
+        # Pydantic will automatically handle missing optional fields
         lite_document = document.__class__.model_validate(lite_data)
 
         return lite_document

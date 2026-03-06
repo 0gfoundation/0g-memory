@@ -1,23 +1,23 @@
 """
-Dual Storage Mixin - Model 层拦截方案
+Dual Storage Mixin - Model layer interception approach
 
-最小侵入方案：通过拦截 self.model 的 MongoDB 调用实现双存储
-- Repository 代码零改动（连 append/get_by_id 等方法都不需要改）
-- 主分支更新 CRUD 时，无需同步更新
-- 双存储完全透明
+Minimal-intrusion approach: dual storage via intercepting MongoDB calls on self.model
+- Zero changes to Repository code (no need to change append/get_by_id or any other methods)
+- No sync needed when main branch updates CRUD
+- Dual storage is completely transparent
 
-工作原理：
-1. 在 __init__ 中替换 self.model 为 DualStorageModelProxy
-2. Proxy 拦截所有 MongoDB 调用（find, get 等）
-3. Monkey patch document 类的实例方法（insert, save, delete）
-4. 自动处理双存储同步
+How it works:
+1. Replace self.model with DualStorageModelProxy in __init__
+2. Proxy intercepts all MongoDB calls (find, get, etc.)
+3. Monkey patch document class instance methods (insert, save, delete)
+4. Dual storage sync is handled automatically
 
-使用示例：
+Usage example:
     class EpisodicMemoryRawRepository(
-        DualStorageMixin,  # 只需添加 Mixin
+        DualStorageMixin,  # Just add the Mixin
         BaseRepository[EpisodicMemory]
     ):
-        # 所有代码完全不变
+        # All other code remains unchanged
         pass
 """
 
@@ -39,34 +39,34 @@ TDocument = TypeVar("TDocument")
 
 class DualStorageMixin(Generic[TDocument]):
     """
-    Dual Storage Mixin - Model 层拦截实现
+    Dual Storage Mixin - Model layer interception implementation
 
-    通过拦截 self.model 来自动实现双存储，Repository 代码零改动。
+    Automatically enables dual storage by intercepting self.model. Zero Repository code changes required.
 
-    工作流程：
-    1. __init__ 时替换 self.model 为 ModelProxy
-    2. Proxy 拦截 find(), get() 等方法
-    3. Monkey patch Document 类的 insert(), save(), delete()
-    4. 所有 MongoDB 操作自动同步 KV-Storage
+    Workflow:
+    1. Replace self.model with ModelProxy in __init__
+    2. Proxy intercepts find(), get(), etc.
+    3. Monkey patch Document class insert(), save(), delete()
+    4. All MongoDB operations are automatically synced to KV-Storage
 
-    优势：
-    - Repository 所有代码完全不需要改动
-    - 主分支更新时无需同步更新
-    - 双存储逻辑完全透明
+    Advantages:
+    - No changes needed to any Repository code
+    - No sync needed when main branch is updated
+    - Dual storage logic is completely transparent
     """
 
     def __init__(self, *args, **kwargs):
         """
         Initialize mixin and setup dual storage interception
 
-        自动：
-        1. 获取 KV-Storage 实例
-        2. 替换 self.model 为 ModelProxy
-        3. Monkey patch Document 实例方法
+        Automatically:
+        1. Get KV-Storage instance
+        2. Replace self.model with ModelProxy
+        3. Monkey patch Document instance methods
         """
         super().__init__(*args, **kwargs)
 
-        # 立即初始化双存储（不延迟）
+        # Initialize dual storage immediately (no lazy init)
         self._kv_storage: Optional[KVStorageInterface] = None
         self._setup_dual_storage()
 
@@ -74,13 +74,13 @@ class DualStorageMixin(Generic[TDocument]):
         """
         Setup dual storage interception immediately
 
-        在 __init__ 时立即设置拦截
+        Set up interception immediately in __init__
         """
         try:
-            # 1. 获取 KV-Storage 实例
+            # 1. Get KV-Storage instance
             self._kv_storage = self._get_kv_storage()
 
-            # 2. 替换 self.model 为 ModelProxy
+            # 2. Replace self.model with ModelProxy
             original_model = self.model
             self.model = DualStorageModelProxy(
                 original_model=original_model,
@@ -88,8 +88,8 @@ class DualStorageMixin(Generic[TDocument]):
                 full_model_class=original_model,
             )
 
-            # 3. Monkey patch Document 类的实例方法
-            # 传递 indexed_fields 给 wrapper
+            # 3. Monkey patch Document class instance methods
+            # Pass indexed_fields to the wrapper
             self._patch_document_methods(original_model, self.model._indexed_fields)
 
             logger.debug(
@@ -110,25 +110,25 @@ class DualStorageMixin(Generic[TDocument]):
 
     def _patch_document_methods(self, document_class, indexed_fields):
         """
-        Monkey patch Document 类的实例方法
+        Monkey patch Document class instance methods
 
-        Wrap insert(), create(), save(), delete() 以实现 Lite 存储：
-        - MongoDB 只存索引字段（Lite）
-        - KV-Storage 存完整数据（Full）
+        Wrap insert(), create(), save(), delete() to enable Lite storage:
+        - MongoDB stores only indexed fields (Lite)
+        - KV-Storage stores full data (Full)
 
         Args:
             document_class: Document model class (e.g., EpisodicMemory)
-            indexed_fields: 索引字段集合（运行时自动提取）
+            indexed_fields: set of indexed fields (extracted automatically at runtime)
         """
         kv_storage = self._kv_storage
 
-        # 保存原始方法
+        # Save original methods
         if not hasattr(document_class, "_original_insert"):
             document_class._original_insert = document_class.insert
             document_class._original_save = document_class.save
             document_class._original_delete = document_class.delete
 
-            # Wrap 实例方法 - 传递 indexed_fields
+            # Wrap instance methods - pass indexed_fields
             document_class.insert = DocumentInstanceWrapper.wrap_insert(
                 document_class._original_insert, kv_storage, indexed_fields
             )
@@ -139,7 +139,7 @@ class DualStorageMixin(Generic[TDocument]):
                 document_class._original_delete, kv_storage
             )
 
-            # Wrap create() method if it exists (Beanie提供的insert别名)
+            # Wrap create() method if it exists (Beanie's alias for insert)
             if hasattr(document_class, "create"):
                 document_class._original_create = document_class.create
                 document_class.create = DocumentInstanceWrapper.wrap_insert(
@@ -159,7 +159,7 @@ class DualStorageMixin(Generic[TDocument]):
                     document_class._original_hard_delete, kv_storage
                 )
 
-            # 统计拦截的方法数量
+            # Count intercepted methods
             patched_methods = ["insert", "save", "delete"]
             if hasattr(document_class, "_original_create"):
                 patched_methods.append("create")

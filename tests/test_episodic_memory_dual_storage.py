@@ -3,8 +3,8 @@
 """
 Test EpisodicMemoryRawRepository with DualStorageMixin (Model Proxy)
 
-Verify that MongoDB Model 层拦截方案works correctly.
-Repository 代码完全不需要改动，所有双存储逻辑由 Mixin 透明处理。
+Verify that the MongoDB Model layer interception approach works correctly.
+Repository code requires zero changes; all dual storage logic is handled transparently by the Mixin.
 """
 
 import asyncio
@@ -80,7 +80,7 @@ def get_logger():
 
 
 class TestDualStorageModelProxy:
-    """Test Model Proxy 拦截方案"""
+    """Test Model Proxy interception approach"""
 
     async def test_01_insert_syncs_to_kv(self, repository, kv_storage, test_user_id):
         """Test: document.insert() is intercepted and syncs to KV-Storage"""
@@ -200,7 +200,7 @@ class TestDualStorageModelProxy:
         logger.info(f"✅ Verified KV-Storage deletion: {doc_id}")
 
     async def test_05_repository_unchanged(self, repository, test_user_id):
-        """Test: Repository 的所有方法完全不需要改动"""
+        """Test: all Repository methods require zero changes"""
         logger = get_logger()
         logger.info("=" * 60)
         logger.info("TEST: Repository methods work unchanged")
@@ -407,13 +407,13 @@ class TestDualStorageModelProxy:
         """
         Test: KV miss behavior in Lite Storage mode
 
-        Lite Storage模式下的预期行为：
-        - MongoDB只存储索引字段（Lite数据）
-        - KV-Storage存储完整数据
-        - 如果KV丢失，无法从MongoDB恢复完整数据（这是设计限制）
-        - 查询会返回None（而不是fallback到MongoDB）
+        Expected behavior in Lite Storage mode:
+        - MongoDB stores only indexed fields (Lite data)
+        - KV-Storage stores full data
+        - If KV is lost, full data cannot be recovered from MongoDB (this is a design limitation)
+        - Queries return None (no fallback to MongoDB)
 
-        这个测试验证Lite模式的限制是正确实施的。
+        This test verifies that Lite mode limitations are correctly enforced.
         """
         logger = get_logger()
         logger.info("=" * 60)
@@ -433,13 +433,13 @@ class TestDualStorageModelProxy:
         kv_value = await kv_storage.get(doc_id)
         assert kv_value is None, "KV should be empty"
 
-        # Lite模式下：KV miss应该返回None（无法从MongoDB恢复完整数据）
+        # In Lite mode: KV miss should return None (cannot recover full data from MongoDB)
         retrieved = await repository.get_by_event_id(doc_id, test_user_id)
         assert retrieved is None, "Lite mode: should return None on KV miss (expected behavior)"
         logger.info(f"✅ Correctly returned None on KV miss (Lite storage limitation)")
 
-        # 注意：在Lite模式下，KV是关键存储，必须保证可靠性
-        # 这个测试验证了当KV丢失时系统的正确行为
+        # Note: in Lite mode, KV is the critical storage and must be reliable
+        # This test verifies the correct system behavior when KV data is lost
         logger.info("✅ Test passed - Lite storage limitation verified")
 
 

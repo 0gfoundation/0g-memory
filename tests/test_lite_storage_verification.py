@@ -3,7 +3,7 @@
 """
 Test Lite Storage Verification
 
-验证 MongoDB 只存储 Lite 数据（索引字段），完整数据存储在 KV-Storage
+Verify that MongoDB stores only Lite data (indexed fields) and full data is stored in KV-Storage
 """
 
 import asyncio
@@ -65,9 +65,9 @@ def create_test_episodic_memory(user_id: str):
         participants=[user_id, "Alice", "Bob"],
         type="Conversation",
         subject="Secret Meeting Discussion",
-        keywords=["security", "confidential"],  # 索引字段，应该在 MongoDB
-        linked_entities=[f"entity_{uuid.uuid4().hex[:8]}"],  # 索引字段
-        extend={"secret_key": "sensitive_value"},  # 应该只在 KV
+        keywords=["security", "confidential"],  # Indexed field, should be in MongoDB
+        linked_entities=[f"entity_{uuid.uuid4().hex[:8]}"],  # Indexed field
+        extend={"secret_key": "sensitive_value"},  # Should exist only in KV
     )
 
 
@@ -78,36 +78,36 @@ def get_logger():
 
 
 class TestLiteStorageVerification:
-    """验证 Lite 存储方案：MongoDB 只存索引字段，KV 存完整数据"""
+    """Verify Lite storage approach: MongoDB stores only indexed fields, KV stores full data"""
 
     async def test_mongodb_only_stores_lite_data(self, repository, kv_storage, test_user_id):
         """
-        核心验证：MongoDB 只存储 Lite 数据（索引字段），敏感字段只在 KV
+        Core verification: MongoDB stores only Lite data (indexed fields), sensitive fields only in KV
 
-        验证点：
-        1. 创建包含敏感字段的文档
-        2. 直接查询 MongoDB 原始数据
-        3. 确认 MongoDB 中敏感字段为 None
-        4. 确认 KV-Storage 中有完整数据
+        Verification points:
+        1. Create a document containing sensitive fields
+        2. Query MongoDB raw data directly
+        3. Confirm sensitive fields are None in MongoDB
+        4. Confirm KV-Storage has full data
         """
         logger = get_logger()
         logger.info("=" * 80)
         logger.info("🔍 CRITICAL TEST: Verify MongoDB ONLY stores Lite data")
 
-        # 1. 创建包含敏感数据的文档
+        # 1. Create a document containing sensitive data
         test_data = create_test_episodic_memory(user_id=test_user_id)
         logger.info(f"📝 Creating document with SENSITIVE data...")
         logger.info(f"   - summary: {test_data.summary}")
         logger.info(f"   - episode: {test_data.episode}")
         logger.info(f"   - extend: {test_data.extend}")
 
-        # 2. 保存文档（应该触发 Lite 存储）
+        # 2. Save the document (should trigger Lite storage)
         created = await repository.append_episodic_memory(test_data)
         assert created is not None
         doc_id = str(created.id)
         logger.info(f"✅ Document created: {doc_id}")
 
-        # 3. 直接从 MongoDB 原始 collection 查询（绕过 Proxy）
+        # 3. Query directly from MongoDB raw collection (bypassing Proxy)
         from infra_layer.adapters.out.persistence.document.memory.episodic_memory import (
             EpisodicMemory,
         )
@@ -119,29 +119,29 @@ class TestLiteStorageVerification:
         assert raw_mongo_doc is not None, "Document should exist in MongoDB"
         logger.info(f"📋 Raw MongoDB document fields: {list(raw_mongo_doc.keys())}")
 
-        # 4. 验证敏感字段在 MongoDB 中为 None 或不存在
+        # 4. Verify that sensitive fields are None or absent in MongoDB
         sensitive_fields = ["summary", "episode", "user_name", "group_name", "participants", "type", "subject", "extend"]
 
         logger.info(f"\n🔍 Checking SENSITIVE fields in MongoDB:")
         for field_name in sensitive_fields:
             mongo_value = raw_mongo_doc.get(field_name)
             if field_name in ["keywords", "linked_entities"]:
-                # 这些是索引字段，应该存在于 MongoDB
+                # These are indexed fields, should be present in MongoDB
                 assert mongo_value is not None, f"Indexed field '{field_name}' should be in MongoDB"
                 logger.info(f"   ✅ {field_name}: {mongo_value} (indexed field, OK in MongoDB)")
             else:
-                # 敏感字段应该为 None 或不存在
+                # Sensitive fields should be None or absent
                 assert mongo_value is None or mongo_value == {}, f"❌ SECURITY RISK: '{field_name}' should NOT be in MongoDB! Got: {mongo_value}"
                 logger.info(f"   ✅ {field_name}: None (SECURE - not in MongoDB)")
 
-        # 5. 验证 KV-Storage 有完整数据
+        # 5. Verify KV-Storage has full data
         kv_value = await kv_storage.get(doc_id)
         assert kv_value is not None, "KV-Storage should have full data"
 
         kv_doc = EpisodicMemory.model_validate_json(kv_value)
         logger.info(f"\n🔐 Checking FULL data in KV-Storage:")
 
-        # 验证敏感数据在 KV 中
+        # Verify sensitive data is in KV
         assert kv_doc.summary == test_data.summary, "Summary should be in KV"
         assert kv_doc.episode == test_data.episode, "Episode should be in KV"
         assert kv_doc.extend == test_data.extend, "Extend should be in KV"
@@ -149,7 +149,7 @@ class TestLiteStorageVerification:
         logger.info(f"   ✅ episode: {kv_doc.episode[:50]}...")
         logger.info(f"   ✅ extend: {kv_doc.extend}")
 
-        # 6. 验证索引字段在 MongoDB 和 KV 都有
+        # 6. Verify indexed fields are present in both MongoDB and KV
         assert raw_mongo_doc.get("keywords") == test_data.keywords, "Keywords should be in MongoDB"
         assert kv_doc.keywords == test_data.keywords, "Keywords should also be in KV"
         logger.info(f"\n✅ Indexed fields present in BOTH MongoDB and KV:")

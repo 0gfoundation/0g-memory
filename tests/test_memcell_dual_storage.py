@@ -3,8 +3,8 @@
 """
 Test MemCellRawRepository with DualStorageMixin (Model Proxy)
 
-Verify that MongoDB Model 层拦截方案 works correctly for MemCell.
-Repository 代码完全不需要改动，所有双存储逻辑由 Mixin 透明处理。
+Verify that the MongoDB Model layer interception approach works correctly for MemCell.
+Repository code requires zero changes; all dual storage logic is handled transparently by the Mixin.
 """
 
 import asyncio
@@ -78,7 +78,7 @@ def get_logger():
 
 
 class TestMemCellDualStorage:
-    """Test MemCell Model Proxy 拦截方案"""
+    """Test MemCell Model Proxy interception approach"""
 
     async def test_01_insert_syncs_to_kv(self, repository, kv_storage, test_user_id):
         """Test: document.insert() is intercepted and syncs to KV-Storage"""
@@ -169,11 +169,11 @@ class TestMemCellDualStorage:
         """
         Test: Soft delete in Lite Storage mode
 
-        Lite Storage模式下的软删除行为：
-        - MongoDB：标记deleted_at（只更新Lite数据）
-        - KV-Storage：保留完整数据（不删除）
+        Soft delete behavior in Lite Storage mode:
+        - MongoDB: mark deleted_at (update Lite data only)
+        - KV-Storage: retain full data (no delete)
 
-        原因：MongoDB只有索引字段，如果删除KV，恢复时无法重建完整数据
+        Reason: MongoDB only has indexed fields; deleting from KV would make recovery impossible
         """
         logger = get_logger()
         logger.info("=" * 60)
@@ -196,7 +196,7 @@ class TestMemCellDualStorage:
         assert deleted is True, "delete_by_event_id failed"
         logger.info(f"✅ Soft deleted in MongoDB: {doc_id}")
 
-        # Lite模式：KV-Storage保留完整数据（不删除）
+        # Lite mode: KV-Storage retains full data (no delete)
         kv_value = await kv_storage.get(doc_id)
         assert kv_value is not None, "Lite mode: KV-Storage should preserve data after soft delete"
         logger.info(f"✅ Verified KV-Storage preserved (Lite mode): {doc_id}")
@@ -240,7 +240,7 @@ class TestMemCellDualStorage:
         logger.info("✅ Test passed")
 
     async def test_06_batch_operations(self, repository, test_user_id):
-        """Test: Repository 的批量操作方法完全不需要改动"""
+        """Test: all Repository batch operation methods require zero changes"""
         logger = get_logger()
         logger.info("=" * 60)
         logger.info("TEST: MemCell batch operations work unchanged")
@@ -337,10 +337,10 @@ class TestMemCellDualStorage:
         """
         Test: restore in Lite Storage mode
 
-        Lite Storage模式下的恢复行为：
-        - 软删除时KV数据被保留（未删除）
-        - 恢复只需要清除MongoDB的deleted_at标记
-        - KV数据一直存在，无需同步
+        Restore behavior in Lite Storage mode:
+        - KV data is retained (not deleted) on soft delete
+        - Restore only needs to clear the deleted_at mark in MongoDB
+        - KV data is always present, no sync needed
         """
         logger = get_logger()
         logger.info("=" * 60)
@@ -356,7 +356,7 @@ class TestMemCellDualStorage:
         await repository.delete_by_event_id(doc_id)
         logger.info(f"✅ Soft deleted: {doc_id}")
 
-        # Lite模式：KV数据被保留（未删除）
+        # Lite mode: KV data is retained (not deleted)
         kv_value = await kv_storage.get(doc_id)
         assert kv_value is not None, "Lite mode: KV should be preserved after soft delete"
         logger.info(f"✅ Verified KV preserved after soft delete: {doc_id}")
@@ -383,10 +383,10 @@ class TestMemCellDualStorage:
         """
         Test: batch restore by user_id in Lite Storage mode
 
-        Lite Storage模式下的批量恢复行为：
-        - 软删除时KV数据被保留（未删除）
-        - 批量恢复只需清除MongoDB的deleted_at标记
-        - KV数据一直存在，无需同步
+        Batch restore behavior in Lite Storage mode:
+        - KV data is retained (not deleted) on soft delete
+        - Batch restore only needs to clear the deleted_at mark in MongoDB
+        - KV data is always present, no sync needed
         """
         logger = get_logger()
         logger.info("=" * 60)
@@ -411,7 +411,7 @@ class TestMemCellDualStorage:
         assert deleted_count >= 3, f"Expected to soft delete at least 3"
         logger.info(f"✅ Soft deleted {deleted_count} records")
 
-        # Lite模式：验证KV数据被保留（未删除）
+        # Lite mode: verify KV data is retained (not deleted)
         for doc_id in created_ids:
             kv_value = await kv_storage.get(doc_id)
             assert kv_value is not None, f"Lite mode: KV should preserve {doc_id} after soft delete"
