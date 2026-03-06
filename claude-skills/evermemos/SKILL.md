@@ -1,13 +1,18 @@
 ---
 name: evermemos
-description: Search and store memories using EverMemOS. PROACTIVELY search before answering ANY project-related questions. Use when user asks about past conversations, previous decisions, or when important information should be remembered. ALWAYS check history before implementing features, debugging issues, or suggesting solutions. Automatically store important decisions, bugs, and patterns. Maintain project continuity across sessions.
-argument-hint: "[search|store|recent] [query/content]"
+description: Search memories using EverMemOS. PROACTIVELY search before answering ANY project-related questions. Use when user asks about past conversations, previous decisions, or when important information should be remembered. ALWAYS check history before implementing features, debugging issues, or suggesting solutions. Maintain project continuity across sessions.
+argument-hint: "search <query> [method] [top_k]"
 allowed-tools: Bash(python3 *)
 ---
 
 # EverMemOS Memory Integration
 
 ## Commands
+
+The script to invoke is always:
+```
+~/.claude/skills/evermemos/scripts/evermemos_client.py
+```
 
 ### search
 
@@ -20,43 +25,52 @@ Search memories by query.
 - `method`: `keyword`, `vector`, `hybrid` (default), `rrf`, `agentic`
 - `top_k`: max results (default: 5)
 
-### store
+**When to use — ALWAYS trigger when:**
+- User asks "What did we discuss about X?" / "Did we fix that bug?" / "What approach did we decide on?"
+- Any question containing: "last time", "before", "previously", "earlier", "remember"
+- Before implementing features (check past approaches)
+- Before debugging (check similar past issues and solutions)
+- User mentions specific modules, files, or components → search that component first
+- User asks how something works in THIS project
 
-Store structured summaries, conclusions, or AI-generated insights.
-
+**Execute:**
+```bash
+python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "<query>" [method] [top_k]
 ```
-/evermemos store <content> [role]
-```
-
-- `role`: `user` or `assistant` (default: `assistant`)
-
-**Important:** Raw user messages are already auto-saved by the UserPromptSubmit hook. Use `store` only for structured summaries — not raw messages.
-
-```
-# Good: structured insight
-/evermemos store "Bug: async_streaming_bulk fails with timeout >30s. Fix: use sync_bulk for large batches." assistant
-
-# Bad: duplicates auto-saved user message
-/evermemos store "Remember that we use hybrid retrieval" user
-```
-
-### recent
-
-Fetch recent conversation history.
-
-```
-/evermemos recent [limit]
-```
-
-- `limit`: number of memories to fetch (default: 10)
 
 ---
 
-## Usage Rules
+## Proactive Usage Rules
 
-**Rule 1 — Search first:** Before answering ANY project-related question, search for relevant history. When in doubt, search. Missing context costs more than an unnecessary search.
+**Rule 1 — Search first, answer second (default behavior):**
 
-**Rule 2 — Store structured insights:** When you discover a bug, reach a decision, or establish a pattern, store a structured summary as `assistant` role. Do not store raw user messages (already auto-saved).
+```
+User asks a question
+    ↓
+Is it about THIS project?
+    YES → SEARCH FIRST (covers 90% of cases)
+    NO  → Is it a general programming question?
+            YES → Answer directly (but consider project context)
+            NO  → SEARCH FIRST (be safe)
+```
+
+When in doubt, search. Missing context costs hours; an unnecessary search costs seconds.
+
+**Rule 2 — Multi-angle search for complex questions:**
+
+Don't search once and give up. Search multiple related angles:
+```bash
+python3 "..." search "authentication implementation"
+python3 "..." search "auth bug fix"
+python3 "..." search "auth security pattern"
+```
+
+**Rule 3 — Before major code changes:**
+1. Search for similar past implementations
+2. Search for related bugs
+3. Search for design decisions on the topic
+
+Then implement using past context.
 
 ---
 
