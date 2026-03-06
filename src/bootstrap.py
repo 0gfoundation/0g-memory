@@ -81,8 +81,12 @@ async def setup_project_context(env_file=".env", mock_mode=False):
     """
     Set up project context environment - exactly copy the loading logic from run.py
     """
-    # Set flag to indicate we're running via bootstrap.py (not actual backend startup)
-    # This prevents startup data sync from running for demo/test scripts
+    # Set flag to indicate we're running via bootstrap.py (not actual backend startup).
+    # This serves two purposes:
+    # 1. Prevents startup data sync from running (data_sync_validation_listener checks this
+    #    flag and skips auto-sync when True, avoiding unnecessary sync in demo/test scripts).
+    # 2. Prevents duplicate initialization in scripts like clear_kv_data.py, which skip
+    #    calling setup_project_context() again when invoked via bootstrap.py.
     os.environ["BOOTSTRAP_MODE"] = "true"
 
     # Copy environment loading logic from run.py

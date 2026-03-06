@@ -162,12 +162,11 @@ class MemoryController(BaseController):
         try:
             # 1. Get JSON body from request (simple direct format)
             message_data = await request.json()
-            _content = message_data.get("content", "")
             logger.info(
                 "Received memorize request (single message): sender_name=%s, role=%s, content=%s",
                 message_data.get("sender_name"),
                 message_data.get("role"),
-                _content,
+                message_data.get("content", ""),
             )
 
             # 2. Convert directly to MemorizeRequest (unified single-step conversion)

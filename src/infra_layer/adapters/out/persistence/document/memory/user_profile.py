@@ -15,6 +15,9 @@ class UserProfile(DocumentBase, AuditBase):
     """
 
     # Composite primary key
+    # Note: Do NOT use Indexed(str) here — indexes are already defined in Settings.indexes below.
+    # Using Indexed(str) alongside Settings.indexes would cause Beanie to create duplicate
+    # indexes on the same fields in MongoDB.
     user_id: str = Field(..., description="User ID")
     group_id: str = Field(..., description="Group ID")
 

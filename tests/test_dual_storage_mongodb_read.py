@@ -20,9 +20,9 @@ import sys
 import asyncio
 from pathlib import Path
 
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+# Add src directory to path
+src_root = Path(__file__).parent.parent / "src"
+sys.path.insert(0, str(src_root))
 
 # IMPORTANT: Must setup environment and DI BEFORE importing repositories
 from common_utils.load_env import setup_environment
