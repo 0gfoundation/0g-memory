@@ -496,7 +496,8 @@ class MemoryController(BaseController):
                 for i, group in enumerate(response.memories):
                     for mem_type, mems in group.items():
                         for mem in mems:
-                            _summary = getattr(mem, "summary", None) or ""
+                            _summary = mem.get("summary") if isinstance(mem, dict) else getattr(mem, "summary", None)
+                            _summary = _summary or ""
                             logger.info(
                                 "Search result [group=%d, type=%s]: summary=%s",
                                 i,

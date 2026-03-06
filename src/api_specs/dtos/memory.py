@@ -693,7 +693,7 @@ class PendingMessage(BaseModel):
 class RetrieveMemResponse(BaseModel):
     """Memory retrieve/search response (result data)"""
 
-    memories: SkipValidation[List[Dict[str, List[BaseMemory]]]] = Field(
+    memories: SkipValidation[List[Dict[str, List[Dict[str, Any]]]]] = Field(
         default_factory=list
     )
     scores: SkipValidation[List[Dict[str, List[float]]]] = Field(default_factory=list)
