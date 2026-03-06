@@ -13,6 +13,7 @@
 #   5. Copies EverMemOS skills to ~/.claude/skills/ and merges hooks into ~/.claude/settings.json
 #   6. Generates .0g_secrets (stream_id + encryption_key)
 #   7. Writes stream_id + encryption_key into kv-server config
+#   8. Downloads zgs_kv binary and places it in 0g_kv_server/
 #
 # To start services after installation, run: ./start_service.sh
 
@@ -118,16 +119,49 @@ if [ -f "$KV_CONFIG" ]; then
     echo "  ✅ stream_ids and encryption_key written to $KV_CONFIG"
 fi
 
+# ── Step 8: Download zgs_kv binary ───────────────────────────────────────────
+echo ""
+echo "▶  Downloading zgs_kv binary..."
+echo ""
+
+ZGS_KV_DIR="$SCRIPT_DIR/0g_kv_server"
+ZGS_KV_BIN="$ZGS_KV_DIR/zgs_kv"
+ZGS_KV_URL="https://github.com/0gfoundation/0g-storage-kv/releases/download/v1.5.0/zgs_kv_linux.zip"
+ZGS_KV_ZIP="/tmp/zgs_kv_linux.zip"
+
+mkdir -p "$ZGS_KV_DIR"
+
+if [ -f "$ZGS_KV_BIN" ]; then
+    echo "  ✅ zgs_kv already exists at $ZGS_KV_BIN, skipping download"
+else
+    if ! command -v curl &>/dev/null && ! command -v wget &>/dev/null; then
+        echo "  ❌ Neither curl nor wget found. Please install one and retry."
+        exit 1
+    fi
+
+    if command -v curl &>/dev/null; then
+        curl -L -o "$ZGS_KV_ZIP" "$ZGS_KV_URL"
+    else
+        wget -O "$ZGS_KV_ZIP" "$ZGS_KV_URL"
+    fi
+
+    if ! command -v unzip &>/dev/null; then
+        echo "  ❌ unzip not found. Please install unzip and retry."
+        exit 1
+    fi
+
+    unzip -o "$ZGS_KV_ZIP" zgs_kv -d "$ZGS_KV_DIR"
+    rm -f "$ZGS_KV_ZIP"
+    chmod +x "$ZGS_KV_BIN"
+    echo "  ✅ zgs_kv downloaded and placed at $ZGS_KV_BIN"
+fi
+
 # ── Done ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "============================================================"
 echo "  ✅ Installation complete!"
 echo ""
 echo "  Secrets:  .0g_secrets"
-echo ""
-echo "  ⚠️  ACTION REQUIRED: Download zgs_kv binary from 0G"
-echo "     Place it at: 0g_kv_server/zgs_kv"
-echo "     Download: https://github.com/0glabs/0g-storage-kv/releases"
 echo ""
 echo "  ⚠️  ACTION REQUIRED: Edit .env and fill in your private keys:"
 echo "       LLM_API_KEY        — your LLM provider API key"
