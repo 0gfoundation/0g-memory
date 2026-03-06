@@ -178,11 +178,9 @@ def format_search_results(response: Dict[str, Any]) -> str:
                 # Use original message time: start_time > timestamp > created_at (all UTC)
                 timestamp = mem.get("start_time") or mem.get("timestamp") or mem.get("created_at", "Unknown time")
                 subject = mem.get("subject", "")
-                summary = mem.get("summary", "")
-                episode = mem.get("episode", "")
+                full_text = mem.get("episode", "") or mem.get("summary", "")
 
-                # Use subject as title, show summary or episode
-                content = f"{subject}\n{summary or episode}" if subject or summary or episode else "No content"
+                content = f"{subject}\n{full_text}" if subject or full_text else "No content"
 
                 output.append(f"  ⏰ [{timestamp}]")
                 output.append(f"  💬 {content}")
@@ -204,8 +202,8 @@ def format_recent_memories(response: Dict[str, Any], pending_response: Dict[str,
         # Prioritize start_time as it contains the actual message time, not the query time
         timestamp = mem.get("start_time") or mem.get("timestamp") or mem.get("created_at", "Unknown time")
         title = mem.get("title", "")
-        summary = mem.get("summary", "")
-        content = f"{title}\n{summary}" if title or summary else "No content"
+        full_text = mem.get("episode", "") or mem.get("summary", "")
+        content = f"{title}\n{full_text}" if title or full_text else "No content"
 
         all_items.append({
             "timestamp": timestamp,
@@ -302,11 +300,11 @@ Examples:
             method = sys.argv[3] if len(sys.argv) > 3 else "hybrid"
             top_k = int(sys.argv[4]) if len(sys.argv) > 4 else 5
 
-            logger.info(f"🔍 Searching memories for: '{query}'")
-            logger.info(f"   Method: {method}, Top K: {top_k}\n")
+            print(f"🔍 Searching memories for: '{query}'")
+            print(f"   Method: {method}, Top K: {top_k}\n")
 
             response = client.search_memories(query, method, top_k)
-            logger.info(format_search_results(response))
+            print(format_search_results(response))
 
         elif command == "store":
             if len(sys.argv) < 3:
@@ -316,19 +314,19 @@ Examples:
             content = sys.argv[2]
             role = sys.argv[3] if len(sys.argv) > 3 else "user"
 
-            logger.info(f"💾 Storing message as '{role}'...")
+            print(f"💾 Storing message as '{role}'...")
 
             response = client.store_message(content, role)
             result = response.get("result", {})
             count = result.get("count", 0)
 
-            logger.info(f"✅ Message stored successfully")
-            logger.info(f"   Extracted {count} memories")
+            print(f"✅ Message stored successfully")
+            print(f"   Extracted {count} memories")
 
         elif command == "recent":
             limit = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 
-            logger.info(f"📜 Fetching {limit} recent memories...\n")
+            print(f"📜 Fetching {limit} recent memories...\n")
 
             # Fetch recent episodic memories
             response = client.fetch_recent_memories(limit)
@@ -340,7 +338,7 @@ Examples:
             except:
                 pending_response = None  # If search fails, continue without pending
 
-            logger.info(format_recent_memories(response, pending_response))
+            print(format_recent_memories(response, pending_response))
 
         else:
             logger.error(f"❌ Unknown command: {command}")
