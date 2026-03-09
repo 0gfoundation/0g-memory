@@ -2,18 +2,21 @@
 
 EverMemOS gives Claude Code persistent memory across sessions. Every conversation is stored, indexed, and automatically retrieved on the next session start.
 
+Memories are stored on the [0G decentralized storage network](https://0g.ai) — encrypted with a key only you hold, persisted on-chain so data survives hardware failures, and never held by any central server.
+
 ---
 
-## Prerequisites
+## Quick Start
 
-- Python 3.12
-- Docker 20.10+ (auto-installed if missing)
+### Prerequisites
+
+- **Linux** (the 0G kv-server binary is Linux-only; Windows users can use WSL2)
+- Python 3.8+ (to run the installer; uv manages Python 3.12 for the app itself)
+- Docker 20.10+ and Docker Compose 2.0+ (auto-installed if missing)
 - [uv](https://astral.sh/uv/) package manager (auto-installed if missing)
-- 4 GB RAM
+- 4 GB RAM, 10 GB free disk space
 
----
-
-## Step 1 — Install
+### 1. Install
 
 ```bash
 git clone https://github.com/EverMind-AI/EverMemOS.git
@@ -21,54 +24,114 @@ cd EverMemOS
 ./install.sh
 ```
 
-`install.sh` does the following once:
-- Installs Python dependencies into `.venv/`
-- Copies EverMemOS skills to `~/.claude/skills/`
-- Adds hooks to `~/.claude/settings.json`
-- Generates `.0g_secrets` (stream ID + encryption key for 0G KV storage)
+### 2. Configure
 
-After it finishes, **fill in `.env`** with your API keys:
+`install.sh` creates a `.env` file from the template. Open it and fill in your API keys:
 
 ```bash
-# Required
-LLM_API_KEY=...           # LLM provider key (for memory extraction)
-VECTORIZE_API_KEY=...     # Embedding service key
-RERANK_API_KEY=...        # Rerank service key
+LLM_API_KEY=...           # any OpenAI-compatible provider (OpenRouter, DeepSeek, xAI, etc.)
+VECTORIZE_API_KEY=...     # embedding service key (e.g. DeepInfra)
+RERANK_API_KEY=...        # rerank service key (e.g. DeepInfra)
 ZEROG_WALLET_KEY=...      # 0G-funded EVM wallet private key
 ```
 
-You also need the `zgs_kv` binary — download from
-[0g-storage-kv releases](https://github.com/0glabs/0g-storage-kv/releases)
-and place it at `0g_kv_server/zgs_kv`.
+> `LLM_BASE_URL` and `LLM_MODEL` in `.env` let you point to any OpenAI-compatible endpoint. The defaults work with [OpenRouter](https://openrouter.ai).
 
-> If Claude Code is already running, **restart it** so the newly added hooks take effect.
+### 3. Start
 
----
-
-## Step 2 — Start
-
-**First time** (right after `install.sh`):
 ```bash
 ./start_service.sh
 ```
 
-**Subsequent starts** (after a `stop_service.sh`):
+> If Claude Code is already running, **restart it** now so the newly registered hooks take effect.
+
+### 4. Use Claude Code normally
+
+EverMemOS runs silently in the background — no extra commands needed. You get:
+
+- **Cross-session memory** — Claude remembers past conversations even after restarting
+- **Auto-injected context** — relevant memories are automatically added to Claude's context at the start of each session
+- **Automatic storage** — every message you send, every Claude reply, and every tool call result is stored without any action on your part
+- **Automatic search** — when you reference past events or ask about something discussed before, Claude automatically searches your memory store and incorporates the results
+
+### 5. Stop & Resume
+
 ```bash
-./start_service.sh --restart
+./stop_service.sh
+./start_service.sh --restart   # always use --restart when resuming
 ```
 
-The `--restart` flag tells the script that the kv-server has an existing stream ID and needs to re-sync data from the blockchain before the backend is ready. Without it, the script assumes a fresh stream and skips the sync wait.
+> `--restart` tells the script to wait for the kv-server to re-sync your memory stream from the blockchain before starting the backend. This can take **a few minutes** if your history is large.
 
-This starts:
-1. **kv-server** (`zgs_kv`) — 0G KV storage node, syncs blockchain
-2. **Docker containers** — MongoDB, Elasticsearch, Milvus, Redis
-3. **EverMemOS backend** — REST API on `http://localhost:1995`
+### 6. Uninstall
+
+```bash
+./uninstall.sh   # WARNING: permanently deletes all stored memories
+```
+
+---
+
+## What It Looks Like in Practice
+
+**Session 1** — you tell Claude something:
+
+> *"I've decided to use PostgreSQL for the new project. We also agreed the API should be RESTful, not GraphQL."*
+
+Claude stores this automatically. You close Claude Code and come back the next day.
+
+**Session 2** — a fresh session, but Claude remembers:
+
+> *"What database did we decide on for the new project?"*
+>
+> Claude: *"You decided on PostgreSQL. You also noted the API should be RESTful rather than GraphQL."*
+
+**Another example** — referencing past work mid-session:
+
+> *"Continue where we left off with the auth module."*
+>
+> Claude automatically searches your memory, finds the previous discussion about the auth module, and picks up from there — without you having to re-explain the context.
+
+---
+
+## Advanced Usage
+
+### What `install.sh` does
+
+`install.sh` sets up everything automatically:
+
+- **Installs Python dependencies** into `.venv/` — the Python packages EverMemOS needs to run.
+- **Installs Claude Code skills** — copies a small script into `~/.claude/skills/`. Claude Code looks in this folder for "skills": tools it can call during a conversation. The EverMemOS skill lets Claude search your memory store on demand.
+- **Registers hooks** — adds entries to `~/.claude/settings.json`. Hooks are shell commands that Claude Code automatically runs at specific moments (e.g. when you submit a prompt, when a session starts). EverMemOS uses hooks to store every message you send and every reply Claude gives, so nothing is lost.
+- **Generates `.0g_secrets`** — creates a stream ID and encryption key for the 0G KV storage layer. Think of the stream ID as a unique address for your personal memory store on the 0G decentralized network, and the encryption key as the password that protects it. These are generated once and reused across restarts.
+- **Downloads `zgs_kv`** — installs the 0G KV server binary into `0g_kv_server/`. This is a lightweight node that connects your machine to the 0G storage network, allowing EverMemOS to persist memories on-chain.
+
+### What `start_service.sh` starts
+
+Three things start in order:
+
+1. **kv-server** (`zgs_kv`) — the 0G KV storage node. It syncs your stream from the blockchain so your memories are available locally.
+2. **Docker containers** — MongoDB, Elasticsearch, Milvus, and Redis. These are the databases that power memory indexing and search.
+3. **EverMemOS backend** — a REST API on `http://localhost:1995` that Claude Code talks to for storing and retrieving memories.
+
+### Why `--restart` is required on resume
+
+When you stop and restart EverMemOS, the kv-server needs to re-sync your existing memory stream from the 0G blockchain before the backend can safely read from it. The `--restart` flag tells the start script to wait for that sync to complete. Depending on the size of your history, this can take anywhere from a few seconds to several minutes. On a first-time start (fresh stream, nothing to sync), the flag is not needed.
+
+### How memory works during a Claude Code session
+
+| Moment | What happens |
+|--------|-------------|
+| Session start | Recent memories are fetched and injected into Claude's context |
+| Every prompt you send | Your message is stored |
+| Every Claude reply | Claude's response is stored |
+| Every tool call | Tool name and result are stored |
+| Question references past context | Claude automatically searches memory and incorporates the results |
 
 ### Verify everything is running
 
 ```bash
 # All 6 Docker containers should show "Up" or "healthy"
-docker compose ps   # or: docker-compose ps
+docker compose ps
 
 # EverMemOS backend health check
 curl http://localhost:1995/health
@@ -78,86 +141,55 @@ curl http://localhost:1995/health
 pgrep -a zgs_kv
 ```
 
----
+### Logs
 
-## Step 3 — Use Claude Code normally
-
-Once started, EverMemOS works automatically in the background:
-
-- **Session start**: recent memories are injected as context into Claude
-- **Every prompt**: your message is stored
-- **Every response**: Claude's reply is stored
-- **Every tool call**: tool name + result is stored
-
-No extra commands needed.
-
----
-
-## Stop & Restart
-
-```bash
-./stop_service.sh
-./start_service.sh --restart
-```
-
-Stops the backend, Docker containers, and kv-server.
-**All stored data is preserved.** The `--restart` flag is required on resume so the script waits for the kv-server to finish re-syncing the existing stream from the blockchain.
-
----
-
-## Uninstall
-
-```bash
-./uninstall.sh
-```
-
-**Warning: this permanently deletes all stored memories.**
-
-Specifically removes:
-- Docker containers + all volumes (MongoDB, Elasticsearch, Milvus, Redis data)
-- `.0g_secrets`, `.env`, `.venv/`
-- EverMemOS skills from `~/.claude/skills/`
-- EverMemOS hooks from `~/.claude/settings.json`
-
-> After uninstall, if you run `install.sh` again, a new stream ID and encryption key are generated — previous data is not recoverable.
-
----
-
-## Logs
-
-| What | Command |
-|---|---|
-| EverMemOS backend | `tail -f $(ls -t logs/evermemos_*.log | head -1)` |
+| Component | Command |
+|-----------|---------|
+| EverMemOS backend | `tail -f $(ls -t logs/evermemos_*.log \| head -1)` |
 | kv-server | `tail -f $(ls -t 0g_kv_server/kv_*.log \| head -1)` |
 | Hook activity | `tail -f ~/.claude/logs/hook_user_prompt.log` |
 
 Quick health check across all components:
 
 ```bash
-# Backend: messages received and memories extracted
 LOG=$(ls -t logs/evermemos_*.log | head -1)
+
+# Messages received and memories extracted
 grep "Received memorize request\|Memory request processing completed" "$LOG" | tail -20
 
 # Search calls (what Claude searched for)
 grep "Received search request" "$LOG" | tail -10
 
-# Per sender type
-grep "sender_name=User"             "$LOG" | wc -l
+# Activity by sender type
+grep "sender_name=User"              "$LOG" | wc -l
 grep "sender_name=Claude (Response)" "$LOG" | wc -l
-grep "sender_name=Claude (Tool)"    "$LOG" | wc -l
+grep "sender_name=Claude (Tool)"     "$LOG" | wc -l
 ```
 
----
+### Uninstall — what gets removed
 
-## Typical Workflow
+```bash
+./uninstall.sh
+```
+
+Permanently removes:
+- Docker containers and all volumes (MongoDB, Elasticsearch, Milvus, Redis data)
+- `.0g_secrets`, `.env`, `.venv/`
+- EverMemOS skills from `~/.claude/skills/`
+- EverMemOS hooks from `~/.claude/settings.json`
+
+> After uninstalling, running `install.sh` again generates a new stream ID and encryption key — **previous memories are not recoverable**.
+
+### Typical workflow
 
 ```
 install.sh
   └─ fill in .env
-       └─ start_service.sh                   ← first time (fresh stream)
+       └─ start_service.sh                        ← first time (fresh stream)
             └─ use Claude Code normally
-                 └─ stop_service.sh           ← data preserved
-                      └─ start_service.sh --restart  ← resume (re-sync chain)
+                 └─ stop_service.sh               ← data preserved
+                      └─ start_service.sh --restart   ← resume (re-sync chain)
                            └─ ...
-                                └─ uninstall.sh  ← removes everything
+                                └─ uninstall.sh   ← removes everything
 ```
+
