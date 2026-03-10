@@ -74,19 +74,6 @@ Then implement using past context.
 
 ---
 
-## Configuration
-
-```bash
-export EVERMEMOS_BASE_URL="http://localhost:1995"   # API endpoint
-export EVERMEMOS_USER_ID="claude_code_user"         # User identifier
-# group_id is auto-derived from the current working directory:
-#   Format: project_<full_path>  e.g. project_/home/op/git/EverMemOS
-# Override only when needed:
-# export EVERMEMOS_GROUP_ID="project_/some/specific/path"
-```
-
----
-
 ## Retrieval Methods
 
 - `keyword`: exact text match, fast
