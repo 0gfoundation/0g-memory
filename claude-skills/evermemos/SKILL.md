@@ -23,7 +23,7 @@ Search memories by query.
 ```
 
 - `method`: `hybrid` (default), `agentic`
-- `top_k`: max results (default: 5)
+- `top_k`: max results (default: 10)
 
 **When to use — ALWAYS trigger when:**
 - User asks "What did we discuss about X?" / "Did we fix that bug?" / "What approach did we decide on?"
@@ -84,4 +84,4 @@ Only use `agentic` when:
 
 **Connection error:** Check that EverMemOS is running (`curl http://localhost:1995`) and `EVERMEMOS_BASE_URL` is correct.
 
-**No results:** Try different keywords, switch to `agentic` method, or increase `top_k`. Verify the correct `user_id` and `group_id` are in use.
+**No results:** Try different keywords, switch to `agentic` method, or increase `top_k`.
