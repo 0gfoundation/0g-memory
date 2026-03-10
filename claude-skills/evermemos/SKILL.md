@@ -1,6 +1,6 @@
 ---
 name: evermemos
-description: Search memories using EverMemOS. PROACTIVELY search before answering ANY project-related questions. Use when user asks about past conversations, previous decisions, or when important information should be remembered. ALWAYS check history before implementing features, debugging issues, or suggesting solutions. Maintain project continuity across sessions.
+description: Search memories using EverMemOS. PROACTIVELY search before answering ANY project-related questions. Use when user asks about past conversations, previous decisions.ALWAYS check history before implementing features, debugging issues, or suggesting solutions. Maintain project continuity across sessions.
 argument-hint: "search <query> [method] [top_k]"
 allowed-tools: Bash(python3 *)
 ---
@@ -60,9 +60,9 @@ When in doubt, search. Missing context costs hours; an unnecessary search costs 
 
 Don't search once and give up. Search multiple related angles:
 ```bash
-python3 "..." search "authentication implementation"
-python3 "..." search "auth bug fix"
-python3 "..." search "auth security pattern"
+python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "authentication implementation"
+python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "auth bug fix"
+python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "auth security pattern"
 ```
 
 **Rule 3 — Before major code changes:**
