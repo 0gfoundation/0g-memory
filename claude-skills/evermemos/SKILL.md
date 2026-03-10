@@ -1,7 +1,7 @@
 ---
 name: evermemos
-description: Search memories using EverMemOS. PROACTIVELY search before answering ANY project-related questions. Use when user asks about past conversations, previous decisions.ALWAYS check history before implementing features, debugging issues, or suggesting solutions. Maintain project continuity across sessions.
-argument-hint: "search <query> [method] [top_k]"
+description: Search memories using EverMemOS. PROACTIVELY search before answering ANY project-related questions. Use when user asks about past conversations, previous decisions. ALWAYS check history before implementing features, debugging issues, or suggesting solutions. Maintain project continuity across sessions. Always put search results into your context window to improve your response.
+argument-hint: search <query> [method] [top_k]
 allowed-tools: Bash(python3 *)
 ---
 
@@ -22,8 +22,8 @@ Search memories by query.
 /evermemos search <query> [method] [top_k]
 ```
 
-- `method`: `keyword`, `vector`, `hybrid` (default), `rrf`, `agentic`
-- `top_k`: max results (default: 5)
+- `method`: `hybrid` (default), `agentic`
+- `top_k`: max results (default: 10)
 
 **When to use — ALWAYS trigger when:**
 - User asks "What did we discuss about X?" / "Did we fix that bug?" / "What approach did we decide on?"
@@ -34,8 +34,15 @@ Search memories by query.
 - User asks how something works in THIS project
 
 **Execute:**
+
+For example, a default search:
 ```bash
-python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "<query>" [method] [top_k]
+python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "<your search query>"
+```
+
+When more precise results or more results are needed, set method to `agentic` and top_k to a larger number (e.g. 15):
+```bash
+python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "<your search query>" agentic 15
 ```
 
 ---
@@ -47,53 +54,36 @@ python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "<qu
 ```
 User asks a question
     ↓
-Is it about THIS project?
-    YES → SEARCH FIRST (covers 90% of cases)
-    NO  → Is it a general programming question?
-            YES → Answer directly (but consider project context)
-            NO  → SEARCH FIRST (be safe)
+Is it about THIS project or past conversations?
+    YES → SEARCH FIRST
+    NO  → Answer directly
 ```
 
 When in doubt, search. Missing context costs hours; an unnecessary search costs seconds.
 
 **Rule 2 — Multi-angle search for complex questions:**
 
-Don't search once and give up. Search multiple related angles:
+Don't search once and give up. Search multiple related angles. For example, if the user asks about authentication, then run the below:
 ```bash
 python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "authentication implementation"
 python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "auth bug fix"
 python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "auth security pattern"
 ```
 
-**Rule 3 — Before major code changes:**
-1. Search for similar past implementations
-2. Search for related bugs
-3. Search for design decisions on the topic
+**Rule 3 — After getting search results:**
 
-Then implement using past context.
-
----
-
-## Configuration
-
-```bash
-export EVERMEMOS_BASE_URL="http://localhost:1995"   # API endpoint
-export EVERMEMOS_USER_ID="claude_code_user"         # User identifier
-# group_id is auto-derived from the current working directory:
-#   Format: project_<full_path>  e.g. project_/home/op/git/EverMemOS
-# Override only when needed:
-# export EVERMEMOS_GROUP_ID="project_/some/specific/path"
-```
+Never search and ignore the results. Always use the search results as context to improve your response.
 
 ---
 
 ## Retrieval Methods
 
-- `keyword`: exact text match, fast
-- `vector`: semantic similarity, understands meaning
-- `hybrid`: keyword + vector combined (recommended default)
-- `rrf`: Reciprocal Rank Fusion, advanced ranking
-- `agentic`: AI-powered intelligent retrieval
+Default: always use `hybrid`.
+
+Only use `agentic` when:
+- Query is vague or ambiguous (e.g. "that bug we discussed last month")
+- `hybrid` returned no useful results
+- User explicitly asks for deep or thorough search
 
 ---
 
@@ -101,6 +91,4 @@ export EVERMEMOS_USER_ID="claude_code_user"         # User identifier
 
 **Connection error:** Check that EverMemOS is running (`curl http://localhost:1995`) and `EVERMEMOS_BASE_URL` is correct.
 
-**No results:** Try different keywords, switch to `hybrid` or `vector` method, or increase `top_k`. Verify the correct `user_id` and `group_id` are in use.
-
-**Permission error:** Ensure Python 3 is installed (`python3 --version`) and the script is executable (`chmod +x ~/.claude/skills/evermemos/scripts/evermemos_client.py`).
+**No results:** Try different keywords, switch to `agentic` method, or increase `top_k`.
