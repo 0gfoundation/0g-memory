@@ -88,5 +88,3 @@ Only use `agentic` when:
 **Connection error:** Check that EverMemOS is running (`curl http://localhost:1995`) and `EVERMEMOS_BASE_URL` is correct.
 
 **No results:** Try different keywords, switch to `agentic` method, or increase `top_k`. Verify the correct `user_id` and `group_id` are in use.
-
-**Permission error:** Ensure Python 3 is installed (`python3 --version`) and the script is executable (`chmod +x ~/.claude/skills/evermemos/scripts/evermemos_client.py`).
