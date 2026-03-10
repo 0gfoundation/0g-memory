@@ -34,8 +34,15 @@ Search memories by query.
 - User asks how something works in THIS project
 
 **Execute:**
+
+For example, a default search:
 ```bash
-python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "<query>" [method] [top_k]
+python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "<your search query>"
+```
+
+When more precise results or more results are needed, set method to `agentic` and top_k to a larger number (e.g. 15):
+```bash
+python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "<your search query>" agentic 15
 ```
 
 ---
