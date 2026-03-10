@@ -47,11 +47,9 @@ python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "<qu
 ```
 User asks a question
     ↓
-Is it about THIS project?
-    YES → SEARCH FIRST (covers 90% of cases)
-    NO  → Is it a general programming question?
-            YES → Answer directly (but consider project context)
-            NO  → SEARCH FIRST (be safe)
+Is it about THIS project or past conversations?
+    YES → SEARCH FIRST
+    NO  → Answer directly
 ```
 
 When in doubt, search. Missing context costs hours; an unnecessary search costs seconds.
