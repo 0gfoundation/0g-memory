@@ -56,7 +56,7 @@ When in doubt, search. Missing context costs hours; an unnecessary search costs 
 
 **Rule 2 — Multi-angle search for complex questions:**
 
-Don't search once and give up. Search multiple related angles:
+Don't search once and give up. Search multiple related angles. For example, if the user asks about authentication, then run the below:
 ```bash
 python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "authentication implementation"
 python3 "$HOME/.claude/skills/evermemos/scripts/evermemos_client.py" search "auth bug fix"
