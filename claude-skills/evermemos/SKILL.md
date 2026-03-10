@@ -1,7 +1,7 @@
 ---
 name: evermemos
 description: Search memories using EverMemOS. PROACTIVELY search before answering ANY project-related questions. Use when user asks about past conversations, previous decisions. ALWAYS check history before implementing features, debugging issues, or suggesting solutions. Maintain project continuity across sessions. Always put search results into your context window to improve your response.
-argument-hint: "search <query> [method] [top_k]"
+argument-hint: search <query> [method] [top_k]
 allowed-tools: Bash(python3 *)
 ---
 
