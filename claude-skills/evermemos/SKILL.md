@@ -22,7 +22,7 @@ Search memories by query.
 /evermemos search <query> [method] [top_k]
 ```
 
-- `method`: `keyword`, `vector`, `hybrid` (default), `rrf`, `agentic`
+- `method`: `hybrid` (default), `agentic`
 - `top_k`: max results (default: 5)
 
 **When to use — ALWAYS trigger when:**
@@ -76,11 +76,12 @@ Then implement using past context.
 
 ## Retrieval Methods
 
-- `keyword`: exact text match, fast
-- `vector`: semantic similarity, understands meaning
-- `hybrid`: keyword + vector combined (recommended default)
-- `rrf`: Reciprocal Rank Fusion, advanced ranking
-- `agentic`: AI-powered intelligent retrieval
+Default: always use `hybrid`.
+
+Only use `agentic` when:
+- Query is vague or ambiguous (e.g. "that bug we discussed last month")
+- `hybrid` returned no useful results
+- User explicitly asks for deep or thorough search
 
 ---
 
