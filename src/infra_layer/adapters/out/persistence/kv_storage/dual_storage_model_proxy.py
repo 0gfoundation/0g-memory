@@ -427,7 +427,8 @@ class DualStorageQueryProxy:
             # 3. Batch-delete from KV-Storage
             if doc_ids:
                 try:
-                    await self._kv_storage.batch_delete(keys=doc_ids)
+                    kv_keys = [get_kv_key(self._full_model_class, doc_id) for doc_id in doc_ids]
+                    await self._kv_storage.batch_delete(keys=kv_keys)
                     logger.debug(f"✅ Deleted {len(doc_ids)} documents from KV-Storage")
                 except Exception as e:
                     logger.warning(f"⚠️  Failed to delete from KV-Storage: {e}")
@@ -966,7 +967,8 @@ class DualStorageModelProxy:
             # 3. Batch-delete from KV-Storage
             if doc_ids:
                 try:
-                    await self._kv_storage.batch_delete(keys=doc_ids)
+                    kv_keys = [get_kv_key(self._original_model, doc_id) for doc_id in doc_ids]
+                    await self._kv_storage.batch_delete(keys=kv_keys)
                     logger.debug(f"✅ Hard deleted {len(doc_ids)} documents from KV-Storage")
                 except Exception as e:
                     logger.warning(f"⚠️  Failed to delete from KV-Storage: {e}")
