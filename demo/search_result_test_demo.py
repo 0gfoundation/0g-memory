@@ -26,8 +26,9 @@ Prerequisites:
     uv run python src/run.py
 
 Run:
-    uv run python src/bootstrap.py demo/search_result_test_demo.py           # search only
-    uv run python src/bootstrap.py demo/search_result_test_demo.py --insert  # insert + search
+    uv run python src/bootstrap.py demo/search_result_test_demo.py                        # search only (rrf)
+    uv run python src/bootstrap.py demo/search_result_test_demo.py --insert               # insert + search (rrf)
+    uv run python src/bootstrap.py demo/search_result_test_demo.py --insert --mode agentic  # insert + search (agentic + rerank)
 """
 
 import argparse
@@ -42,7 +43,13 @@ async def main():
         action="store_true",
         help="Insert the 10 topic conversations before searching",
     )
+    parser.add_argument(
+        "--mode",
+        default="rrf",
+        help="Retrieval mode: rrf (default), keyword, vector, hybrid, agentic",
+    )
     args = parser.parse_args()
+    search_mode = args.mode
 
     memory = SimpleMemoryManager()
 
@@ -235,60 +242,70 @@ async def main():
     await memory.search(
         "What happened in the Champions League final? Who scored the goals?",
         user_id="",
+        mode=search_mode,
     )
 
     print("\n━━━ [Query 2 / Stocks] ━━━")
     await memory.search(
         "What did the user say about their stock investments and Tesla?",
         user_id="",
+        mode=search_mode,
     )
 
     print("\n━━━ [Query 3 / Cat Care] ━━━")
     await memory.search(
         "What did the vet say about Luna the cat after vaccination?",
         user_id="",
+        mode=search_mode,
     )
 
     print("\n━━━ [Query 4 / Cooking] ━━━")
     await memory.search(
         "How did the user make carbonara pasta? What ingredients were used?",
         user_id="",
+        mode=search_mode,
     )
 
     print("\n━━━ [Query 5 / Travel] ━━━")
     await memory.search(
         "What is the user's Japan trip plan? Which cities will they visit?",
         user_id="",
+        mode=search_mode,
     )
 
     print("\n━━━ [Query 6 / Python] ━━━")
     await memory.search(
         "What Python asyncio problem was the user solving? What pattern did they use?",
         user_id="",
+        mode=search_mode,
     )
 
     print("\n━━━ [Query 7 / Fitness] ━━━")
     await memory.search(
         "What strength training program is the user following? What issue did they have with deadlifts?",
         user_id="",
+        mode=search_mode,
     )
 
     print("\n━━━ [Query 8 / Music] ━━━")
     await memory.search(
         "What classical music concert did the user attend? Which symphony was performed?",
         user_id="",
+        mode=search_mode,
     )
 
     print("\n━━━ [Query 9 / History] ━━━")
     await memory.search(
         "What does the user think caused the fall of the Roman Empire?",
         user_id="",
+        mode=search_mode,
     )
 
     print("\n━━━ [Query 10 / Space] ━━━")
     await memory.search(
         "What did the James Webb Space Telescope recently discover or photograph?",
         user_id="",
+        mode=search_mode,
     )
 
     # ========== Done ==========
