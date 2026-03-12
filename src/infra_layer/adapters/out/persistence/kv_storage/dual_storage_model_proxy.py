@@ -427,7 +427,8 @@ class DualStorageQueryProxy:
             # 3. Batch-delete from KV-Storage
             if doc_ids:
                 try:
-                    await self._kv_storage.batch_delete(keys=doc_ids)
+                    kv_keys = [get_kv_key(self._full_model_class, doc_id) for doc_id in doc_ids]
+                    await self._kv_storage.batch_delete(keys=kv_keys)
                     logger.debug(f"✅ Deleted {len(doc_ids)} documents from KV-Storage")
                 except Exception as e:
                     logger.warning(f"⚠️  Failed to delete from KV-Storage: {e}")
@@ -966,7 +967,8 @@ class DualStorageModelProxy:
             # 3. Batch-delete from KV-Storage
             if doc_ids:
                 try:
-                    await self._kv_storage.batch_delete(keys=doc_ids)
+                    kv_keys = [get_kv_key(self._original_model, doc_id) for doc_id in doc_ids]
+                    await self._kv_storage.batch_delete(keys=kv_keys)
                     logger.debug(f"✅ Hard deleted {len(doc_ids)} documents from KV-Storage")
                 except Exception as e:
                     logger.warning(f"⚠️  Failed to delete from KV-Storage: {e}")
@@ -1213,9 +1215,16 @@ class DocumentInstanceWrapper:
                 await kv_storage.put(key=kv_key, value=kv_value)
                 logger.debug(f"💾 MongoDB: Lite ({len(lite_data)} fields), KV: Full ({len(full_data_for_kv)} fields) - {kv_key}")
             except Exception as e:
-                logger.warning(f"⚠️  Failed to sync full data to KV-Storage: {e}")
-                import traceback
-                traceback.print_exc()
+                # KV write failed — roll back the MongoDB insert to keep both sides consistent.
+                # Without rollback, MongoDB has a lite doc but KV has nothing, causing every
+                # subsequent find_one to KV-miss and every upsert to hit E11000 permanently.
+                logger.error(f"❌ KV-Storage write failed, rolling back MongoDB insert for {doc_id}: {e}")
+                try:
+                    await mongo_collection.delete_one({"_id": insert_result.inserted_id}, session=session)
+                    logger.info(f"↩️  MongoDB rollback succeeded for {doc_id}")
+                except Exception as rollback_err:
+                    logger.error(f"❌ MongoDB rollback also failed for {doc_id}: {rollback_err}")
+                raise
 
             # 6. Return document object (Beanie's insert returns self)
             return self
