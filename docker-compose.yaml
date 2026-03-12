@@ -52,17 +52,23 @@ services:
 
   # Milvus vector database
   milvus-etcd:
-    image: quay.io/coreos/etcd:v3.5.5
+    # bitnami/etcd supports both amd64 and arm64 (Apple Silicon compatible)
+    image: bitnami/etcd:3.5
     container_name: memsys-milvus-etcd
     restart: unless-stopped
     environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://127.0.0.1:2479
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2479
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2480
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://127.0.0.1:2480
+      - ETCD_DATA_DIR=/etcd
       - ETCD_AUTO_COMPACTION_MODE=revision
       - ETCD_AUTO_COMPACTION_RETENTION=1000
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
       - ETCD_SNAPSHOT_COUNT=50000
-    command: etcd -advertise-client-urls=http://127.0.0.1:2479 -listen-client-urls http://0.0.0.0:2479 --data-dir /etcd
     healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health", "--endpoints=http://localhost:2479"]
+      test: ["CMD", "etcdctl", "--endpoints=http://localhost:2479", "endpoint", "health"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -72,7 +78,8 @@ services:
       - memsys-network
 
   milvus-minio:
-    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    # Upgraded to a release with stable arm64 support (Apple Silicon compatible)
+    image: minio/minio:RELEASE.2024-03-15T01-07-19Z
     container_name: memsys-milvus-minio
     restart: unless-stopped
     environment:
@@ -93,6 +100,7 @@ services:
       - memsys-network
 
   milvus-standalone:
+    # milvusdb/milvus supports both amd64 and arm64 since v2.3 (Apple Silicon compatible)
     image: milvusdb/milvus:v2.5.2
     container_name: memsys-milvus-standalone
     restart: unless-stopped

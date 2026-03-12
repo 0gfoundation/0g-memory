@@ -137,7 +137,7 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     MONGO_OK=false
     ES_OK=false
 
-    (echo > /dev/tcp/localhost/27017) 2>/dev/null && MONGO_OK=true || true
+    nc -z localhost 27017 2>/dev/null && MONGO_OK=true || true
     # Use ES cluster health API instead of TCP check: port open ≠ ES ready.
     # wait_for_status=yellow ensures all primary shards are allocated before returning.
     # Must check "timed_out":false in the response body — ES always returns HTTP 200
