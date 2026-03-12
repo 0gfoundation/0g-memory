@@ -23,6 +23,20 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ── Detect OS and CPU architecture ───────────────────────────────────────────
+OS=$(uname -s)    # "Linux" or "Darwin"
+ARCH=$(uname -m)  # "x86_64" or "arm64"
+
+# Portable in-place sed: BSD sed (macOS) requires an explicit backup extension
+# (we pass "" for no backup), while GNU sed (Linux) does not accept that form.
+sed_inplace() {
+    if [ "$OS" = "Darwin" ]; then
+        sed -i "" "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 echo ""
 echo "============================================================"
 echo "           EverMemOS Installer"
@@ -113,8 +127,8 @@ if [ -f "$KV_CONFIG" ]; then
     ZEROG_STREAM_ID=$(grep '^ZEROG_STREAM_ID=' .0g_secrets | cut -d'=' -f2)
     ZEROG_ENCRYPTION_KEY=$(grep '^ZEROG_ENCRYPTION_KEY=' .0g_secrets | cut -d'=' -f2)
 
-    sed -i "s|stream_ids = \[\"[^\"]*\"\]|stream_ids = [\"$ZEROG_STREAM_ID\"]|" "$KV_CONFIG"
-    sed -i "s|encryption_key = \"[^\"]*\"|encryption_key = \"$ZEROG_ENCRYPTION_KEY\"|" "$KV_CONFIG"
+    sed_inplace "s|stream_ids = \[\"[^\"]*\"\]|stream_ids = [\"$ZEROG_STREAM_ID\"]|" "$KV_CONFIG"
+    sed_inplace "s|encryption_key = \"[^\"]*\"|encryption_key = \"$ZEROG_ENCRYPTION_KEY\"|" "$KV_CONFIG"
 
     echo "  ✅ stream_ids and encryption_key written to $KV_CONFIG"
 fi
@@ -126,14 +140,27 @@ echo ""
 
 ZGS_KV_DIR="$SCRIPT_DIR/0g_kv_server"
 ZGS_KV_BIN="$ZGS_KV_DIR/zgs_kv"
-ZGS_KV_URL="https://github.com/0gfoundation/0g-storage-kv/releases/download/v1.5.0/zgs_kv_linux.zip"
-ZGS_KV_ZIP="/tmp/zgs_kv_linux.zip"
+ZGS_KV_VERSION="v1.5.0"
+ZGS_KV_BASE="https://github.com/0gfoundation/0g-storage-kv/releases/download/${ZGS_KV_VERSION}"
+
+# Select the correct binary for the current OS
+if [ "$OS" = "Darwin" ]; then
+    ZGS_KV_ZIP_NAME="zgs_kv_mac.zip"
+else
+    # Default to Linux
+    ZGS_KV_ZIP_NAME="zgs_kv_linux.zip"
+fi
+
+ZGS_KV_URL="${ZGS_KV_BASE}/${ZGS_KV_ZIP_NAME}"
+ZGS_KV_ZIP="/tmp/${ZGS_KV_ZIP_NAME}"
 
 mkdir -p "$ZGS_KV_DIR"
 
 if [ -f "$ZGS_KV_BIN" ]; then
     echo "  ✅ zgs_kv already exists at $ZGS_KV_BIN, skipping download"
 else
+    echo "  ℹ️  Platform: $OS/$ARCH → downloading $ZGS_KV_ZIP_NAME"
+
     if ! command -v curl &>/dev/null && ! command -v wget &>/dev/null; then
         echo "  ❌ Neither curl nor wget found. Please install one and retry."
         exit 1

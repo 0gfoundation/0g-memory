@@ -381,8 +381,15 @@ class SetupManager:
         """Install Docker Compose on macOS"""
         self.print_info("Detected macOS system")
 
-        # Docker Desktop for macOS includes Docker Compose v2
-        self.print_info("Docker Desktop for macOS includes Docker Compose v2")
+        # Docker Desktop for macOS includes Docker Compose v2; check if it is
+        # already usable before showing any error.
+        has_compose, _ = self.run_command(["docker", "compose", "version"], check=False)
+        if has_compose:
+            self.print_success("Docker Compose (v2) is already available via Docker Desktop")
+            return True
+
+        # Not available yet — guide the user.
+        self.print_info("Docker Desktop for macOS includes Docker Compose v2.")
         self.print_info("If Docker is installed but Compose isn't working:")
         self.print_info("  1. Make sure Docker Desktop is running")
         self.print_info("  2. Check Docker Desktop version is up to date")
