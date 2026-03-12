@@ -1213,9 +1213,16 @@ class DocumentInstanceWrapper:
                 await kv_storage.put(key=kv_key, value=kv_value)
                 logger.debug(f"💾 MongoDB: Lite ({len(lite_data)} fields), KV: Full ({len(full_data_for_kv)} fields) - {kv_key}")
             except Exception as e:
-                logger.warning(f"⚠️  Failed to sync full data to KV-Storage: {e}")
-                import traceback
-                traceback.print_exc()
+                # KV write failed — roll back the MongoDB insert to keep both sides consistent.
+                # Without rollback, MongoDB has a lite doc but KV has nothing, causing every
+                # subsequent find_one to KV-miss and every upsert to hit E11000 permanently.
+                logger.error(f"❌ KV-Storage write failed, rolling back MongoDB insert for {doc_id}: {e}")
+                try:
+                    await mongo_collection.delete_one({"_id": insert_result.inserted_id}, session=session)
+                    logger.info(f"↩️  MongoDB rollback succeeded for {doc_id}")
+                except Exception as rollback_err:
+                    logger.error(f"❌ MongoDB rollback also failed for {doc_id}: {rollback_err}")
+                raise
 
             # 6. Return document object (Beanie's insert returns self)
             return self

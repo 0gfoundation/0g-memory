@@ -300,12 +300,38 @@ class ConversationMetaRawRepository(
                 )
                 return new_doc
             except Exception as create_error:
-                logger.error(
-                    "❌ Failed to create conversation metadata: %s",
-                    create_error,
-                    exc_info=True,
-                )
-                return None
+                error_str = str(create_error)
+                if "E11000" in error_str and "duplicate key" in error_str:
+                    logger.warning(
+                        "⚠️  Concurrent creation conflict, re-lookup and update: group_id=%s",
+                        group_id,
+                    )
+                    retry_doc = await self.model.find_one(
+                        {"group_id": group_id}, session=session
+                    )
+                    if retry_doc:
+                        for key, value in conversation_data.items():
+                            if hasattr(retry_doc, key):
+                                setattr(retry_doc, key, value)
+                        await retry_doc.save(session=session)
+                        logger.debug(
+                            "✅ Successfully updated after concurrency conflict: group_id=%s",
+                            group_id,
+                        )
+                        return retry_doc
+                    else:
+                        logger.error(
+                            "❌ Still unable to find record after concurrency conflict: group_id=%s",
+                            group_id,
+                        )
+                        return None
+                else:
+                    logger.error(
+                        "❌ Failed to create conversation metadata: %s",
+                        create_error,
+                        exc_info=True,
+                    )
+                    return None
 
         except ValidationException:
             # Re-raise ValidationException to propagate detailed error info
