@@ -74,6 +74,7 @@ dependencies = [
     "prometheus-client>=0.20.0",
     # 0G Storage SDK
     "zg-storage>=0.2.0",
+    "httpx[socks]>=0.28.1",
 ]
 
 [build-system]

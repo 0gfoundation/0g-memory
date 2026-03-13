@@ -122,9 +122,11 @@ class OpenAIProvider(LLMProvider):
         for retry_num in range(max_retries):
             try:
                 timeout = aiohttp.ClientTimeout(total=600)
+                proxy = os.environ.get("https_proxy") or os.environ.get("http_proxy")
                 async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.post(
-                        f"{self.base_url}/chat/completions", json=data, headers=headers
+                        f"{self.base_url}/chat/completions", json=data, headers=headers,
+                        proxy=proxy,
                     ) as response:
                         chunks = []
                         async for chunk in response.content.iter_any():
