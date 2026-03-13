@@ -61,7 +61,7 @@ services:
       - ETCD_AUTO_COMPACTION_RETENTION=1000
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
       - ETCD_SNAPSHOT_COUNT=50000
-    command: etcd -advertise-client-urls=http://127.0.0.1:2479 -listen-client-urls http://0.0.0.0:2479 --data-dir /etcd
+    command: etcd -advertise-client-urls=http://milvus-etcd:2479 -listen-client-urls http://0.0.0.0:2479 --data-dir /etcd
     healthcheck:
       test: ["CMD", "etcdctl", "endpoint", "health", "--endpoints=http://localhost:2479"]
       interval: 30s
@@ -85,7 +85,7 @@ services:
       - "9000:9000"
     command: minio server /minio_data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -115,8 +115,10 @@ services:
       retries: 3
       start_period: 90s
     depends_on:
-      - milvus-etcd
-      - milvus-minio
+      milvus-etcd:
+        condition: service_healthy
+      milvus-minio:
+        condition: service_healthy
     networks:
       - memsys-network
 
