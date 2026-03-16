@@ -26,8 +26,8 @@ Memories are stored on the [0G decentralized storage network](https://0g.ai) —
 ### 1. Install
 
 ```bash
-git clone https://github.com/EverMind-AI/EverMemOS.git
-cd EverMemOS
+git clone https://github.com/0gfoundation/0g-memory.git
+cd 0g-memory
 ./install.sh
 ```
 
