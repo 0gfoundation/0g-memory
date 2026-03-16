@@ -21,7 +21,7 @@ cp -r claude-skills/evermemos ~/.claude/skills/
 ## 配置（可选）
 
 ```bash
-export EVERMEMOS_BASE_URL="http://localhost:1995"
+export API_BASE_URL="http://localhost:1995"
 export EVERMEMOS_USER_ID="your_username"
 ```
 

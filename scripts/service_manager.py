@@ -204,7 +204,7 @@ class ServiceManager:
                 print(f"⚙️  Mode: {status['mode']}")
 
             print(f"\n📝 Logs: tail -f {self.log_file}")
-            print(f"⏹️  Stop: /evermemos-start stop")
+            print(f"⏹️  Stop: ./stop_service.sh")
         else:
             print(f"🔴 Status: Stopped")
             print(f"\n🚀 Start: /evermemos-start")

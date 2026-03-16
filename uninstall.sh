@@ -146,7 +146,7 @@ for event in list(hooks.keys()):
         del hooks[event]
 
 # Remove EverMemOS env vars
-evermemos_env_keys = {"EVERMEMOS_BASE_URL", "EVERMEMOS_USER_ID", "EVERMEMOS_GROUP_ID"}
+evermemos_env_keys = {"API_BASE_URL", "EVERMEMOS_USER_ID", "EVERMEMOS_GROUP_ID"}
 env = settings.get("env", {})
 removed_env = [k for k in evermemos_env_keys if k in env]
 for k in removed_env:

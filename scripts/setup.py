@@ -624,7 +624,7 @@ class SetupManager:
         # Ensure env vars are set so hooks know where to reach the backend
         if "env" not in settings:
             settings["env"] = {}
-        settings["env"].setdefault("EVERMEMOS_BASE_URL", "http://localhost:1995")
+        settings["env"].setdefault("API_BASE_URL", "http://localhost:1995")
         settings["env"].setdefault("EVERMEMOS_USER_ID", "claude_code_user")
 
         if "hooks" not in settings:
