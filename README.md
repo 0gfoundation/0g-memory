@@ -10,9 +10,9 @@ Memories are stored on the [0G decentralized storage network](https://0g.ai) —
 
 ### Prerequisites
 
-| | Linux | macOS |
+| | Ubuntu | macOS |
 |---|---|---|
-| OS | Ubuntu / Debian / RHEL / CentOS | macOS 12+ |
+| OS | Ubuntu 20.04+ | macOS 12+ |
 | Python 3.8+ ¹ | typically pre-installed | typically pre-installed |
 | [Homebrew](https://brew.sh) | — | [Appendix A](#appendix-a-installing-homebrew-on-macos) |
 | Docker 20.10+ | auto-installed if missing | [Appendix B](#appendix-b-installing-docker-on-macos) |
@@ -20,8 +20,6 @@ Memories are stored on the [0G decentralized storage network](https://0g.ai) —
 | RAM / Disk | 4 GB RAM, 10 GB free disk | 4 GB RAM, 10 GB free disk |
 
 > ¹ Python 3.8+ is required only to run the installer. The application itself requires Python 3.12, which **uv downloads and manages automatically** — you do not need to install 3.12 yourself.
-
-> **Windows users:** use WSL2 and follow the Linux path.
 
 ### 1. Install
 
@@ -38,9 +36,11 @@ cd 0g-memory
 ```bash
 LLM_API_KEY=...           # any OpenAI-compatible provider (OpenRouter, DeepSeek, xAI, etc.)
 VECTORIZE_API_KEY=...     # embedding service key — if using OpenAI (default), same as LLM_API_KEY
-RERANK_API_KEY=...        # rerank service key (e.g. DeepInfra)
+RERANK_API_KEY=...        # rerank service key — requires a rerank-capable provider (default: DeepInfra)
 ZEROG_WALLET_KEY=...      # EVM wallet private key funded with 0G testnet tokens (see Appendix C)
 ```
+
+> **Note on `RERANK_API_KEY`:** OpenAI does not provide a reranking API. The default rerank provider is **[DeepInfra](https://deepinfra.com)** — sign up, copy your API key, and paste it here. The default model is `Qwen/Qwen3-Reranker-4B`. `RERANK_BASE_URL` and `RERANK_MODEL` in `.env` let you point to any compatible rerank endpoint (e.g. a self-hosted vLLM instance).
 
 > `LLM_BASE_URL` and `LLM_MODEL` in `.env` let you point to any OpenAI-compatible endpoint. The defaults use **OpenAI directly** (`gpt-4o-mini`). To switch to [OpenRouter](https://openrouter.ai) or another provider, update `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY` accordingly.
 
