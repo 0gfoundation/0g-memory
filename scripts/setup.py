@@ -289,8 +289,6 @@ class SetupManager:
                 subprocess.run(
                     ["brew", "install", "--cask", "docker"],
                     check=True,
-                    capture_output=True,
-                    text=True
                 )
 
                 self.print_success("Docker Desktop installed")
