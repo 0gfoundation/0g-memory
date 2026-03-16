@@ -130,7 +130,7 @@ fi
 # ── Step 2b: Wait for Docker services ready (MongoDB 27017 + Elasticsearch 19200) ─
 echo ""
 echo "  ⏳ Waiting for Docker services to be ready..."
-TIMEOUT=180  # 3 minutes max (ES cold-start after volume wipe can be slow)
+TIMEOUT=300  # 5 minutes max (ES cold-start after volume wipe can be slow; macOS Docker VM adds latency)
 ELAPSED=0
 
 while [ $ELAPSED -lt $TIMEOUT ]; do
