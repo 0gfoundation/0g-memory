@@ -10,11 +10,16 @@ Memories are stored on the [0G decentralized storage network](https://0g.ai) —
 
 ### Prerequisites
 
-- **Linux** (the 0G kv-server binary is Linux-only; Windows users can use WSL2)
-- Python 3.8+ (to run the installer; uv manages Python 3.12 for the app itself)
-- Docker 20.10+ and Docker Compose 2.0+ (auto-installed if missing)
-- [uv](https://astral.sh/uv/) package manager (auto-installed if missing)
-- 4 GB RAM, 10 GB free disk space
+| | Linux | macOS |
+|---|---|---|
+| OS | Ubuntu / Debian / RHEL / CentOS | macOS 12+ |
+| Python 3.8+ | typically pre-installed | typically pre-installed |
+| [Homebrew](https://brew.sh) | — | [Appendix A](#appendix-a-installing-homebrew-on-macos) |
+| Docker 20.10+ | auto-installed if missing | [Appendix B](#appendix-b-installing-docker-on-macos) |
+| [uv](https://astral.sh/uv/) | auto-installed if missing | auto-installed via brew if missing |
+| RAM / Disk | 4 GB RAM, 10 GB free disk | 4 GB RAM, 10 GB free disk |
+
+> **Windows users:** use WSL2 and follow the Linux path.
 
 ### 1. Install
 
@@ -193,3 +198,42 @@ install.sh
                                 └─ uninstall.sh   ← removes everything
 ```
 
+---
+
+## Appendix: macOS Dependency Installation
+
+### Appendix A: Installing Homebrew on macOS
+
+[Homebrew](https://brew.sh) is the standard package manager for macOS. It is required for the `install.sh` script to auto-install `uv` on macOS.
+
+```bash
+# 1. Install Homebrew
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 2. Add Homebrew to your shell profile (Apple Silicon Macs)
+echo >> ~/.zprofile
+echo 'eval "$(/opt/homebrew/bin/brew shellenv zsh)"' >> ~/.zprofile
+eval "$(/opt/homebrew/bin/brew shellenv zsh)"
+```
+
+> **Intel Macs:** Homebrew installs to `/usr/local/bin`, which is already in PATH. Step 2 is not needed.
+
+Verify the installation:
+
+```bash
+brew --version
+```
+
+### Appendix B: Installing Docker on macOS
+
+Docker Desktop for macOS includes both Docker Engine and Docker Compose.
+
+```bash
+# Install Docker Desktop via Homebrew (recommended)
+brew install --cask docker
+
+# Launch Docker Desktop
+open -a Docker
+```
+
+Wait for the Docker whale icon to appear in the menu bar and show **"Docker Desktop is running"** before proceeding.

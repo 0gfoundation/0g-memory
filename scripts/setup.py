@@ -117,27 +117,47 @@ class SetupManager:
         return False
 
     def install_uv(self) -> bool:
-        """Install uv package manager"""
+        """Install uv package manager (brew on macOS, curl installer on Linux)"""
         self.print_info("Installing uv...")
 
         try:
-            # Download and run installer
-            install_cmd = "curl -LsSf https://astral.sh/uv/install.sh | sh"
-            result = subprocess.run(
-                install_cmd,
-                shell=True,
-                check=True,
-                capture_output=True,
-                text=True
-            )
+            if self.os_type == "darwin":
+                # macOS: prefer Homebrew
+                if not self.check_command_exists("brew"):
+                    self.print_error("Homebrew not found. Please install it from https://brew.sh and retry.")
+                    return False
+                self.print_info("Using Homebrew to install uv...")
+                result = subprocess.run(
+                    ["brew", "install", "uv"],
+                    check=True,
+                )
+            else:
+                # Linux: use the official curl installer
+                self.print_info("Using curl installer to install uv...")
+                install_cmd = "curl -LsSf https://astral.sh/uv/install.sh | sh"
+                result = subprocess.run(
+                    install_cmd,
+                    shell=True,
+                    check=True,
+                )
 
-            # Reload PATH
-            uv_bin = Path.home() / ".cargo" / "bin"
-            if uv_bin.exists():
-                os.environ["PATH"] = f"{uv_bin}:{os.environ['PATH']}"
+            # Reload PATH — uv may be installed to ~/.local/bin or ~/.cargo/bin
+            for candidate in [
+                Path.home() / ".local" / "bin",
+                Path.home() / ".cargo" / "bin",
+            ]:
+                if candidate.exists():
+                    path_str = str(candidate)
+                    if path_str not in os.environ["PATH"]:
+                        os.environ["PATH"] = f"{path_str}:{os.environ['PATH']}"
 
             self.print_success("uv installed successfully")
             return True
+        except subprocess.CalledProcessError as e:
+            self.print_error(f"Failed to install uv: {e}")
+            if hasattr(e, "stderr") and e.stderr:
+                self.print_error(e.stderr)
+            return False
         except Exception as e:
             self.print_error(f"Failed to install uv: {e}")
             return False
@@ -671,18 +691,20 @@ class SetupManager:
 
         # Step 2: Check/Install uv
         if not self.check_uv():
-            if non_interactive:
-                self.print_error("uv is required for dependency management")
-                return False
-
             self.print_info("uv is required for dependency management")
-            response = input("Install uv now? (y/n): ").lower()
-            if response == 'y':
+
+            if non_interactive:
+                self.print_info("Non-interactive mode: installing uv automatically...")
                 if not self.install_uv():
                     return False
             else:
-                self.print_error("uv is required to continue")
-                return False
+                response = input("Install uv now? (y/n): ").lower()
+                if response == 'y':
+                    if not self.install_uv():
+                        return False
+                else:
+                    self.print_error("uv is required to continue")
+                    return False
 
         # Step 3: Install dependencies
         if not self.install_dependencies():
