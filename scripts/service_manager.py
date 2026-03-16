@@ -112,7 +112,7 @@ class ServiceManager:
 
             # Poll until API is accessible or timeout
             print("⏳ Waiting for EverMemOS API to be ready...", end="", flush=True)
-            deadline = time.time() + 30
+            deadline = time.time() + 300
             while time.time() < deadline:
                 time.sleep(1)
                 print(".", end="", flush=True)
@@ -130,7 +130,7 @@ class ServiceManager:
                     return True
 
             print()
-            print("❌ Service did not become accessible within 30s")
+            print("❌ Service did not become accessible within 300s")
             print(f"   Check logs: cat {self.log_file}")
             return False
         else:
