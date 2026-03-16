@@ -13,11 +13,13 @@ Memories are stored on the [0G decentralized storage network](https://0g.ai) —
 | | Linux | macOS |
 |---|---|---|
 | OS | Ubuntu / Debian / RHEL / CentOS | macOS 12+ |
-| Python 3.8+ | typically pre-installed | typically pre-installed |
+| Python 3.8+ ¹ | typically pre-installed | typically pre-installed |
 | [Homebrew](https://brew.sh) | — | [Appendix A](#appendix-a-installing-homebrew-on-macos) |
 | Docker 20.10+ | auto-installed if missing | [Appendix B](#appendix-b-installing-docker-on-macos) |
 | [uv](https://astral.sh/uv/) | auto-installed if missing | auto-installed via brew if missing |
 | RAM / Disk | 4 GB RAM, 10 GB free disk | 4 GB RAM, 10 GB free disk |
+
+> ¹ Python 3.8+ is required only to run the installer. The application itself requires Python 3.12, which **uv downloads and manages automatically** — you do not need to install 3.12 yourself.
 
 > **Windows users:** use WSL2 and follow the Linux path.
 
@@ -37,16 +39,18 @@ cd EverMemOS
 LLM_API_KEY=...           # any OpenAI-compatible provider (OpenRouter, DeepSeek, xAI, etc.)
 VECTORIZE_API_KEY=...     # embedding service key (e.g. DeepInfra)
 RERANK_API_KEY=...        # rerank service key (e.g. DeepInfra)
-ZEROG_WALLET_KEY=...      # 0G-funded EVM wallet private key
+ZEROG_WALLET_KEY=...      # EVM wallet private key funded with 0G testnet tokens (see Appendix C)
 ```
 
-> `LLM_BASE_URL` and `LLM_MODEL` in `.env` let you point to any OpenAI-compatible endpoint. The defaults work with [OpenRouter](https://openrouter.ai).
+> `LLM_BASE_URL` and `LLM_MODEL` in `.env` let you point to any OpenAI-compatible endpoint. The defaults use **OpenAI directly** (`gpt-4o-mini`). To switch to [OpenRouter](https://openrouter.ai) or another provider, update `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY` accordingly.
 
 ### 3. Start
 
 ```bash
 ./start_service.sh
 ```
+
+> **First run only:** Docker will pull ~4 GB of images (Elasticsearch, MongoDB, Milvus, Redis). This can take **5–15 minutes** depending on your connection. The terminal will show download progress — it is not hanging.
 
 > If Claude Code is already running, **restart it** now so the newly registered hooks take effect.
 
@@ -200,7 +204,7 @@ install.sh
 
 ---
 
-## Appendix: macOS Dependency Installation
+## Appendix: Setup Guides
 
 ### Appendix A: Installing Homebrew on macOS
 
@@ -237,3 +241,45 @@ open -a Docker
 ```
 
 Wait for the Docker whale icon to appear in the menu bar and show **"Docker Desktop is running"** before proceeding.
+
+### Appendix C: Getting Your `ZEROG_WALLET_KEY`
+
+`ZEROG_WALLET_KEY` is the 64-character hex private key of an EVM wallet. EverMemOS uses it to write your encrypted memories to the [0G decentralized storage network](https://0g.ai). This project uses the **0G Galileo Testnet**, so you need a wallet funded with free testnet tokens.
+
+#### Step 1 — Get a wallet (MetaMask)
+
+If you do not have MetaMask installed, download it from [metamask.io](https://metamask.io) and create a new wallet.
+
+#### Step 2 — Add the 0G Galileo Testnet to MetaMask
+
+In MetaMask, go to **Settings → Networks → Add a network** and enter:
+
+| Field | Value |
+|-------|-------|
+| Network name | 0G-Galileo-Testnet |
+| RPC URL | `https://evmrpc-galileo.0g.ai` |
+| Chain ID | `16602` |
+| Currency symbol | `0G` |
+| Block explorer | `https://chainscan-galileo.0g.ai` |
+
+#### Step 3 — Get free testnet tokens
+
+Visit the 0G faucet and request tokens for your wallet address:
+[https://faucet.0g.ai](https://faucet.0g.ai)
+
+#### Step 4 — Export the private key from MetaMask
+
+1. Open MetaMask and click your **Account** icon (top right)
+2. Click the **⋮** menu to the right of your account name → **Account Details**
+3. Click **Show private key**
+4. Enter your MetaMask password to confirm
+5. Make sure the selected network is **0G-Galileo-Testnet**
+6. Click the **copy icon** on the right to copy the 64-character hex key
+
+Paste that value into `.env`:
+
+```bash
+ZEROG_WALLET_KEY=<your 64-character hex private key here>
+```
+
+> ⚠️ **Security reminder:** never share your private key, never commit it to version control. Anyone with this key has full control of the wallet.
