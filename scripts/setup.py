@@ -292,9 +292,30 @@ class SetupManager:
                 )
 
                 self.print_success("Docker Desktop installed")
-                self.print_warning("Please start Docker Desktop from Applications")
-                self.print_info("After Docker Desktop starts, re-run this setup")
-                return True
+                self.print_info("Launching Docker Desktop automatically...")
+                try:
+                    subprocess.run(["open", "-a", "Docker"], check=True)
+                except subprocess.CalledProcessError:
+                    pass  # May already be running; continue to wait
+
+                # Poll until Docker daemon responds (up to 90 seconds)
+                import time
+                self.print_info("Waiting for Docker daemon to start (up to 90s)...")
+                for i in range(90):
+                    ok, _ = self.run_command(["docker", "info"], check=False)
+                    if ok:
+                        self.print_success("Docker daemon is running")
+                        return True
+                    if i > 0 and i % 15 == 0:
+                        self.print_info(f"  Still waiting... ({i}s elapsed)")
+                    time.sleep(1)
+
+                self.print_error("Docker daemon did not start within 90 seconds")
+                self.print_info("Please:")
+                self.print_info("  1. Open Docker Desktop from Applications manually")
+                self.print_info("  2. Wait for it to fully start (whale icon in menu bar stops animating)")
+                self.print_info("  3. Re-run this setup")
+                return False
 
             except subprocess.CalledProcessError:
                 self.print_error("Homebrew installation failed")
@@ -628,33 +649,49 @@ class SetupManager:
         if "hooks" not in settings:
             settings["hooks"] = {}
 
+        # Resolve absolute python3 path to avoid PATH lookup failures when
+        # Claude Code runs hooks in a restricted environment (common on macOS).
+        python3_path = shutil.which("python3") or "python3"
+        self.print_info(f"Using python3 at: {python3_path}")
+
         # Hook definitions: (event, matcher_or_None, command, timeout)
         new_hooks = [
             ("SessionStart",    "startup|clear|compact",
-             "python3 \"$HOME/.claude/skills/evermemos/scripts/hook_session_start.py\"", 30),
+             f'"{python3_path}" "$HOME/.claude/skills/evermemos/scripts/hook_session_start.py"', 30),
             ("UserPromptSubmit", None,
-             "python3 \"$HOME/.claude/skills/evermemos/scripts/hook_user_prompt.py\"",  15),
+             f'"{python3_path}" "$HOME/.claude/skills/evermemos/scripts/hook_user_prompt.py"',  15),
             ("PostToolUse",     "*",
-             "python3 \"$HOME/.claude/skills/evermemos/scripts/hook_tool_use.py\"",     20),
+             f'"{python3_path}" "$HOME/.claude/skills/evermemos/scripts/hook_tool_use.py"',     20),
             ("Stop",            None,
-             "python3 \"$HOME/.claude/skills/evermemos/scripts/hook_stop.py\"",         30),
+             f'"{python3_path}" "$HOME/.claude/skills/evermemos/scripts/hook_stop.py"',         30),
             ("SessionEnd",      None,
-             "python3 \"$HOME/.claude/skills/evermemos/scripts/hook_session_end.py\"",  30),
+             f'"{python3_path}" "$HOME/.claude/skills/evermemos/scripts/hook_session_end.py"',  30),
         ]
 
         for event, matcher, command, timeout in new_hooks:
             existing = settings["hooks"].get(event, [])
 
-            # Idempotent: skip if this script is already registered
-            script_name = command.split("/")[-1].rstrip('"')
+            # Idempotent: skip if this exact command is already registered.
+            # We match on the full command string so that an older registration
+            # using bare "python3" is replaced by the new absolute-path command.
             already_present = any(
-                script_name in h.get("command", "")
+                h.get("command", "") == command
                 for group in existing
                 for h in group.get("hooks", [])
             )
             if already_present:
                 self.print_info(f"Hook {event} already configured, skipping")
                 continue
+
+            # Remove any existing hook entry for this script so we can replace
+            # it with the updated command (e.g. python3 path changed).
+            script_name = command.split("/")[-1].rstrip('"')
+            settings["hooks"][event] = [
+                group for group in existing
+                if not any(script_name in h.get("command", "")
+                           for h in group.get("hooks", []))
+            ]
+            existing = settings["hooks"][event]
 
             hook_group: dict = {
                 "hooks": [{"type": "command", "command": command, "timeout": timeout}]

@@ -37,6 +37,24 @@ echo "           EverMemOS Service Starter"
 echo "============================================================"
 echo ""
 
+# ── Validate .env configuration ──────────────────────────────────────────────
+ENV_FILE="$SCRIPT_DIR/.env"
+if [ ! -f "$ENV_FILE" ]; then
+    echo "❌ .env file not found. Please create it from env.template.0g.example:"
+    echo "   cp env.template.0g.example .env"
+    echo "   Then edit .env and fill in your actual values."
+    exit 1
+fi
+
+WALLET_KEY=$(grep '^ZEROG_WALLET_KEY=' "$ENV_FILE" | cut -d'=' -f2 | tr -d ' \r')
+if [ -z "$WALLET_KEY" ] || ! echo "$WALLET_KEY" | grep -qE '^[0-9a-fA-F]{64}$'; then
+    echo "❌ ZEROG_WALLET_KEY in .env is missing or invalid."
+    echo "   Expected: 64-character hexadecimal string (without 0x prefix)."
+    echo "   Please set your EVM wallet private key."
+    echo "   See Appendix C in README.md for step-by-step instructions."
+    exit 1
+fi
+
 # ── Step 1a: Start kv-server in background ───────────────────────────────────
 echo "▶  Checking kv-server (zgs_kv)..."
 echo ""
