@@ -40,6 +40,9 @@ class ServiceManager:
             # Check if process exists
             os.kill(pid, 0)
             return True
+        except PermissionError:
+            # Process exists but owned by another user
+            return True
         except (ProcessLookupError, ValueError):
             # Process doesn't exist, clean up stale PID file
             self.pid_file.unlink(missing_ok=True)
@@ -62,7 +65,7 @@ class ServiceManager:
                 req = urllib.request.Request("http://localhost:1995/health")
                 with urllib.request.urlopen(req, timeout=2) as response:
                     status["api_accessible"] = response.status == 200
-            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError):
+            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
                 pass
 
         # Check configuration file
@@ -107,24 +110,29 @@ class ServiceManager:
             # Save PID
             self.pid_file.write_text(str(process.pid))
 
-            # Wait a moment and verify
-            time.sleep(2)
-
-            if self.is_running():
+            # Poll until API is accessible or timeout
+            print("⏳ Waiting for EverMemOS API to be ready...", end="", flush=True)
+            deadline = time.time() + 30
+            while time.time() < deadline:
+                time.sleep(1)
+                print(".", end="", flush=True)
                 status = self.get_status()
+                if not status["running"]:
+                    print()
+                    print("❌ Service exited unexpectedly")
+                    print(f"   Check logs: cat {self.log_file}")
+                    return False
                 if status["api_accessible"]:
+                    print()
                     print(f"✅ EverMemOS started successfully (PID: {process.pid})")
                     print(f"📝 Logs: {self.log_file}")
                     print(f"🌐 API: http://localhost:1995")
                     return True
-                else:
-                    print("⚠️  Service started but API not accessible yet")
-                    print(f"   Check logs: tail -f {self.log_file}")
-                    return True
-            else:
-                print("❌ Failed to start service")
-                print(f"   Check logs: cat {self.log_file}")
-                return False
+
+            print()
+            print("❌ Service did not become accessible within 30s")
+            print(f"   Check logs: cat {self.log_file}")
+            return False
         else:
             # Run in foreground
             print("🚀 Starting EverMemOS (foreground mode)...")
@@ -179,7 +187,8 @@ class ServiceManager:
     def restart(self) -> bool:
         """Restart EverMemOS service"""
         print("🔄 Restarting EverMemOS...")
-        self.stop()
+        if not self.stop():
+            return False
         time.sleep(1)
         return self.start()
 
