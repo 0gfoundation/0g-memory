@@ -89,6 +89,6 @@ Only use `agentic` when:
 
 ## Troubleshooting
 
-**Connection error:** Check that EverMemOS is running (`curl http://localhost:1995`) and `EVERMEMOS_BASE_URL` is correct.
+**Connection error:** Check that EverMemOS is running (`curl http://localhost:1995`) and `API_BASE_URL` is correct.
 
 **No results:** Try different keywords, switch to `agentic` method, or increase `top_k`.

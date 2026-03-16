@@ -13,6 +13,7 @@ import os
 import sys
 import uvicorn
 import logging
+from urllib.parse import urlparse
 
 # Environment variables are not loaded yet, so cannot use get_logger
 logger = logging.getLogger(__name__)
@@ -27,16 +28,10 @@ def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description=f"Start {APP_NAME} service")
     parser.add_argument(
-        "--host",
-        type=str,
-        default=None,
-        help="Server listening host address (env: MEMSYS_HOST, default: 0.0.0.0)",
-    )
-    parser.add_argument(
         "--port",
         type=int,
         default=None,
-        help="Server listening port (env: MEMSYS_PORT, default: 1995)",
+        help="Server listening port (overrides port in API_BASE_URL, default: 1995)",
     )
     parser.add_argument(
         "--env-file",
@@ -86,20 +81,14 @@ def main():
         service_name=service_name,
     )
 
-    # Determine host and port: CLI args > env vars > defaults
-    if args.host is not None:
-        host = args.host
-    elif os.getenv("MEMSYS_HOST"):
-        host = os.getenv("MEMSYS_HOST")
-    else:
-        host = "0.0.0.0"
-
+    # Determine port: CLI arg > port in API_BASE_URL > default 1995
+    # Host is always 0.0.0.0 (bind all interfaces)
+    host = "0.0.0.0"
     if args.port is not None:
         port = args.port
-    elif os.getenv("MEMSYS_PORT"):
-        port = int(os.getenv("MEMSYS_PORT"))
     else:
-        port = 1995
+        api_base_url = os.getenv("API_BASE_URL", "http://localhost:1995")
+        port = urlparse(api_base_url).port or 1995
 
     # Check if Mock mode is enabled: prioritize command line argument, then environment variable
     from core.di.utils import enable_mock_mode

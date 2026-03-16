@@ -30,7 +30,7 @@ logger = get_logger("hook_tool_use")
 
 
 def _is_service_available():
-    base_url = os.environ.get('EVERMEMOS_BASE_URL', 'http://localhost:1995')
+    base_url = os.environ.get('API_BASE_URL', 'http://localhost:1995')
     try:
         urllib.request.urlopen(f"{base_url}/health", timeout=1)
         return True
@@ -69,7 +69,7 @@ def read_hook_input():
 def get_env_config():
     """Get EverMemOS configuration from environment variables"""
     return {
-        'base_url': os.environ.get('EVERMEMOS_BASE_URL', 'http://localhost:1995'),
+        'base_url': os.environ.get('API_BASE_URL', 'http://localhost:1995'),
         'user_id': os.environ.get('EVERMEMOS_USER_ID', 'claude_code_user'),
     }
 

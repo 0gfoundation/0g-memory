@@ -33,7 +33,7 @@ logger = get_logger("hook_session_start")
 
 
 def _is_service_available():
-    base_url = os.environ.get('EVERMEMOS_BASE_URL', 'http://localhost:1995')
+    base_url = os.environ.get('API_BASE_URL', 'http://localhost:1995')
     try:
         urllib.request.urlopen(f"{base_url}/health", timeout=1)
         return True
@@ -44,7 +44,7 @@ def _is_service_available():
 def get_env_config():
     """Get configuration from environment variables"""
     return {
-        'base_url': os.environ.get('EVERMEMOS_BASE_URL', 'http://localhost:1995'),
+        'base_url': os.environ.get('API_BASE_URL', 'http://localhost:1995'),
         'user_id': os.environ.get('EVERMEMOS_USER_ID', 'claude_code_user'),
     }
 
