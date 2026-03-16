@@ -37,7 +37,7 @@ cd EverMemOS
 
 ```bash
 LLM_API_KEY=...           # any OpenAI-compatible provider (OpenRouter, DeepSeek, xAI, etc.)
-VECTORIZE_API_KEY=...     # embedding service key (e.g. DeepInfra)
+VECTORIZE_API_KEY=...     # embedding service key — if using OpenAI (default), same as LLM_API_KEY
 RERANK_API_KEY=...        # rerank service key (e.g. DeepInfra)
 ZEROG_WALLET_KEY=...      # EVM wallet private key funded with 0G testnet tokens (see Appendix C)
 ```
@@ -264,8 +264,7 @@ In MetaMask, go to **Settings → Networks → Add a network** and enter:
 
 #### Step 3 — Get free testnet tokens
 
-Visit the 0G faucet and request tokens for your wallet address:
-[https://faucet.0g.ai](https://faucet.0g.ai)
+Ask the 0G admin to send testnet tokens to your wallet address.
 
 #### Step 4 — Export the private key from MetaMask
 
@@ -273,7 +272,7 @@ Visit the 0G faucet and request tokens for your wallet address:
 2. Click the **⋮** menu to the right of your account name → **Account Details**
 3. Click **Show private key**
 4. Enter your MetaMask password to confirm
-5. Make sure the selected network is **0G-Galileo-Testnet**
+5. Select a network (e.g. **0G-Galileo-Testnet**)
 6. Click the **copy icon** on the right to copy the 64-character hex key
 
 Paste that value into `.env`:
