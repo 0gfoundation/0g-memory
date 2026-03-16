@@ -290,6 +290,10 @@ class DeepInfraRerankService(RerankServiceInterface):
             logger.debug(
                 f"Starting reranking, query text: {query}, number of texts: {len(all_texts)}"
             )
+            logger.info("Rerank input | query: %s", query)
+            for i, text in enumerate(all_texts):
+                logger.info("Rerank input | [%d] %s", i, text)
+
             rerank_result = await self.rerank_documents(query, all_texts, instruction)
 
             if "results" not in rerank_result:
@@ -317,6 +321,14 @@ class DeepInfraRerankService(RerankServiceInterface):
                 top_scores = [f"{h.get('score', 0):.4f}" for h in reranked_hits[:3]]
                 logger.info(
                     f"Reranking completed: {len(reranked_hits)} results, top scores: {top_scores}"
+                )
+            logger.info("Rerank output | query: %s", query)
+            for i, h in enumerate(reranked_hits):
+                logger.info(
+                    "Rerank output | [%d] score=%.4f | %s",
+                    i,
+                    h.get("score", 0.0),
+                    self._extract_text_from_hit(h),
                 )
             return reranked_hits
 

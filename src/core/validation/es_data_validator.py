@@ -439,15 +439,17 @@ async def _sync_missing_documents(
                 error_count += len(batch_ids)
 
     # Use bulk API to sync documents
+    # Initialize outside try so the except block can reference len(actions) for BUG-2 fix
+    actions = []
     try:
         # Collect all actions from generator
-        actions = []
         async for action in generate_actions():
             actions.append(action)
 
         if not actions:
             logger.warning("No actions generated for %s", doc_type)
-            return 0, 0
+            # BUG-1 fix: preserve error_count from generation phase instead of returning (0, 0)
+            return 0, error_count
 
         # Workaround: elasticsearch helpers (async_bulk, async_streaming_bulk) hang after bulk completes
         # Use raw client API instead
@@ -468,23 +470,28 @@ async def _sync_missing_documents(
         response = await es_client.bulk(body=body)
 
         # Process response
-        synced_count = 0
-        error_count = 0
+        # BUG-1 fix: use separate bulk counters so generation-phase errors in error_count are preserved
+        bulk_synced = 0
+        bulk_errors = 0
 
         if response and "items" in response:
             for item in response["items"]:
                 for op_type, result in item.items():
                     if result.get("status", 0) in (200, 201):
-                        synced_count += 1
+                        bulk_synced += 1
                     else:
-                        error_count += 1
-                        if error_count <= 5:  # Log first 5 errors
+                        bulk_errors += 1
+                        if bulk_errors <= 5:  # Log first 5 errors
                             logger.error("Bulk error: %s", result.get("error", result))
 
+        synced_count += bulk_synced
+        error_count += bulk_errors
         logger.info("Batch sync completed: %d documents synced", synced_count)
 
     except Exception as e:
         logger.error("Error during bulk sync for %s: %s", doc_type, e, exc_info=True)
+        # BUG-2 fix: count all actions that failed to reach ES as errors
+        error_count += len(actions)
         # Don't return here, continue to try refresh
 
     # Refresh index to make documents searchable
