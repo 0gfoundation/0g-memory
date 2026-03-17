@@ -10,9 +10,10 @@ Memories are stored on the [0G decentralized storage network](https://0g.ai) —
 
 ### Prerequisites
 
-| | Ubuntu | macOS |
+| Requirement | Ubuntu | macOS |
 |---|---|---|
 | OS | Ubuntu 20.04+ | macOS 12+ |
+| [Claude Code](https://claude.ai/code) | must be installed | must be installed |
 | Python 3.8+ ¹ | typically pre-installed | typically pre-installed |
 | [Homebrew](https://brew.sh) | — | [Appendix A](#appendix-a-installing-homebrew-on-macos) |
 | Docker 20.10+ | auto-installed if missing | [Appendix B](#appendix-b-installing-docker-on-macos) |
@@ -46,13 +47,24 @@ ZEROG_WALLET_KEY=...      # EVM wallet private key funded with 0G testnet tokens
 
 ### 3. Start
 
+> **First run only:** Docker will pull ~4 GB of images (Elasticsearch, MongoDB, Milvus, Redis). This can take **5–15 minutes** depending on your connection. The terminal will show download progress — it is not hanging.
+
 ```bash
 ./start_service.sh
 ```
 
-> **First run only:** Docker will pull ~4 GB of images (Elasticsearch, MongoDB, Milvus, Redis). This can take **5–15 minutes** depending on your connection. The terminal will show download progress — it is not hanging.
+When startup completes successfully, you will see:
 
-> If Claude Code is already running, **restart it** now so the newly registered hooks take effect.
+```
+============================================================
+  ✅ EverMemOS is ready!
+
+  API:      http://localhost:1995
+  Logs:     logs/evermemos_<timestamp>.log
+============================================================
+```
+
+> If Claude Code is already running, **restart it** now so the hooks registered by `install.sh` take effect.
 
 ### 4. Verify Memory Works — A 2-Minute Test
 
@@ -74,7 +86,7 @@ Claude will acknowledge. You do not need to do anything else — EverMemOS store
 
 #### Step B — Close and reopen Claude Code
 
-Quit Claude Code completely and reopen it. This starts a fresh session with no conversation history.
+Type `/exit` to quit Claude Code, then reopen it. This starts a fresh session with no conversation history.
 
 #### Step C — New session: ask Claude to recall
 
@@ -100,27 +112,20 @@ What API style did we settle on?
 | Auth bug | JWT expiry was set in seconds instead of milliseconds |
 | API style | RESTful — GraphQL was ruled out after the team review |
 
-If Claude answers correctly with the specific details (JSONB, milliseconds, GraphQL ruled out), memory is working. If Claude says it has no memory of prior conversations, check the troubleshooting steps in the [Advanced Usage](#advanced-usage) section.
-
-#### Optional: confirm via logs
-
-```bash
-LOG=$(ls -t logs/evermemos_*.log | head -1)
-
-# Messages stored in the seed session
-grep "Memory request processing completed" "$LOG" | tail -5
-
-# Search calls triggered in the new session
-grep "Received search request" "$LOG" | tail -5
-```
-
-You should see storage entries from the seed session and search entries from the recall session.
+If Claude answers correctly with the specific details (JSONB, milliseconds, GraphQL ruled out), memory is working. If Claude says it has no memory of prior conversations, check [Verify everything is running](#verify-everything-is-running) in the Advanced Usage section.
 
 ### 5. Stop & Resume
 
+When you are done for the day:
+
 ```bash
 ./stop_service.sh
-./start_service.sh --restart   # always use --restart when resuming
+```
+
+When you come back and want to resume:
+
+```bash
+./start_service.sh --restart
 ```
 
 > `--restart` tells the script to wait for the kv-server to re-sync your memory stream from the blockchain before starting the backend. This can take **a few minutes** if your history is large.
@@ -128,7 +133,22 @@ You should see storage entries from the seed session and search entries from the
 ### 6. Uninstall
 
 ```bash
-./uninstall.sh   # WARNING: permanently deletes all stored memories
+./uninstall.sh
+```
+
+> **Warning:** this permanently deletes all stored memories. Running `install.sh` again generates a new stream ID — **previous memories are not recoverable**.
+
+### Typical workflow
+
+```
+install.sh
+  └─ fill in .env
+       └─ start_service.sh                        ← first time (fresh stream)
+            └─ use Claude Code normally
+                 └─ stop_service.sh               ← data preserved
+                      └─ start_service.sh --restart   ← resume (re-sync chain)
+                           └─ ...
+                                └─ uninstall.sh   ← removes everything
 ```
 
 ---
@@ -177,7 +197,7 @@ This is the core value: the longer you use Claude Code with EverMemOS running, t
 | Every prompt you send | Your message is stored |
 | Every Claude reply | Claude's response is stored |
 | Every tool call | Tool name and result are stored |
-| Question references past context | Claude automatically searches memory and incorporates the results |
+| Question references past context (e.g. "last time", "previously", "continue where we left off") | Claude automatically searches memory and incorporates the results |
 
 ### What `install.sh` does
 
@@ -203,8 +223,11 @@ When you stop and restart EverMemOS, the kv-server needs to re-sync your existin
 
 ### Verify everything is running
 
+Run these from the `0g-memory` project directory:
+
 ```bash
-# All 6 Docker containers should show "Up" or "healthy"
+# Expect 6 containers: MongoDB, Elasticsearch, Redis, and Milvus
+# (Milvus spawns 3 sub-containers: standalone, etcd, and minio)
 docker compose ps
 
 # EverMemOS backend health check
@@ -213,15 +236,32 @@ curl http://localhost:1995/health
 
 # kv-server process
 pgrep -a zgs_kv
+# If running, outputs the PID and binary path, e.g.:
+#   12345 /home/user/0g-memory/0g_kv_server/zgs_kv --config ...
+# No output means the kv-server is not running.
 ```
 
 ### Logs
+
+All log commands below must be run from the `0g-memory` project directory.
 
 | Component | Command |
 |-----------|---------|
 | EverMemOS backend | `tail -f $(ls -t logs/evermemos_*.log \| head -1)` |
 | kv-server | `tail -f $(ls -t 0g_kv_server/kv_*.log \| head -1)` |
 | Hook activity | `tail -f ~/.claude/logs/hook_user_prompt.log` |
+
+To confirm the 2-minute test worked, run these after completing both the seed session and the recall session. You should see storage entries from the seed session and search entries from the recall session:
+
+```bash
+LOG=$(ls -t logs/evermemos_*.log | head -1)
+
+# Messages stored in the seed session
+grep "Memory request processing completed" "$LOG" | tail -5
+
+# Search calls triggered in the recall session
+grep "Received search request" "$LOG" | tail -5
+```
 
 Quick health check across all components:
 
@@ -253,19 +293,6 @@ Permanently removes:
 - EverMemOS hooks from `~/.claude/settings.json`
 
 > After uninstalling, running `install.sh` again generates a new stream ID and encryption key — **previous memories are not recoverable**.
-
-### Typical workflow
-
-```
-install.sh
-  └─ fill in .env
-       └─ start_service.sh                        ← first time (fresh stream)
-            └─ use Claude Code normally
-                 └─ stop_service.sh               ← data preserved
-                      └─ start_service.sh --restart   ← resume (re-sync chain)
-                           └─ ...
-                                └─ uninstall.sh   ← removes everything
-```
 
 ---
 
@@ -329,7 +356,7 @@ In MetaMask, go to **Settings → Networks → Add a network** and enter:
 
 #### Step 3 — Get free testnet tokens
 
-Ask the 0G admin to send testnet tokens to your wallet address.
+Contact the 0G admin (xinyu@0g.ai) and include your wallet address. They will send testnet tokens to it.
 
 #### Step 4 — Export the private key from MetaMask
 
