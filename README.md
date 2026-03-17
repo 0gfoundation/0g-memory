@@ -54,14 +54,67 @@ ZEROG_WALLET_KEY=...      # EVM wallet private key funded with 0G testnet tokens
 
 > If Claude Code is already running, **restart it** now so the newly registered hooks take effect.
 
-### 4. Use Claude Code normally
+### 4. Verify Memory Works — A 2-Minute Test
 
-EverMemOS runs silently in the background — no extra commands needed. You get:
+EverMemOS runs silently in the background. The fastest way to confirm it is working is to plant a few facts, restart, and ask Claude to recall them.
 
-- **Cross-session memory** — Claude remembers past conversations even after restarting
-- **Auto-injected context** — relevant memories are automatically added to Claude's context at the start of each session
-- **Automatic storage** — every message you send, every Claude reply, and every tool call result is stored without any action on your part
-- **Automatic search** — when you reference past events or ask about something discussed before, Claude automatically searches your memory store and incorporates the results
+#### Step A — Seed session: tell Claude specific facts
+
+Open Claude Code and send this message (copy it exactly):
+
+```
+I want to record a few project decisions for later:
+1. We chose PostgreSQL over MySQL because we need JSONB support for our metadata schema.
+2. The auth bug was caused by JWT expiry being set in seconds instead of milliseconds.
+3. The API design is RESTful — we explicitly ruled out GraphQL after the team review.
+Please confirm you've noted these.
+```
+
+Claude will acknowledge. You do not need to do anything else — EverMemOS stores everything automatically.
+
+#### Step B — Close and reopen Claude Code
+
+Quit Claude Code completely and reopen it. This starts a fresh session with no conversation history.
+
+#### Step C — New session: ask Claude to recall
+
+Send these questions one at a time:
+
+```
+What database did we choose, and why?
+```
+
+```
+What was the root cause of the auth bug?
+```
+
+```
+What API style did we settle on?
+```
+
+**Expected results:**
+
+| Question | Claude should answer |
+|---|---|
+| Database choice | PostgreSQL — needed JSONB support for metadata schema |
+| Auth bug | JWT expiry was set in seconds instead of milliseconds |
+| API style | RESTful — GraphQL was ruled out after the team review |
+
+If Claude answers correctly with the specific details (JSONB, milliseconds, GraphQL ruled out), memory is working. If Claude says it has no memory of prior conversations, check the troubleshooting steps in the [Advanced Usage](#advanced-usage) section.
+
+#### Optional: confirm via logs
+
+```bash
+LOG=$(ls -t logs/evermemos_*.log | head -1)
+
+# Messages stored in the seed session
+grep "Memory request processing completed" "$LOG" | tail -5
+
+# Search calls triggered in the new session
+grep "Received search request" "$LOG" | tail -5
+```
+
+You should see storage entries from the seed session and search entries from the recall session.
 
 ### 5. Stop & Resume
 
@@ -80,29 +133,51 @@ EverMemOS runs silently in the background — no extra commands needed. You get:
 
 ---
 
-## What It Looks Like in Practice
+## Advanced Usage
 
-**Session 1** — you tell Claude something:
+### How EverMemOS works
 
-> *"I've decided to use PostgreSQL for the new project. We also agreed the API should be RESTful, not GraphQL."*
+EverMemOS intercepts every message you send and every reply Claude gives, stores them as structured memories, and makes those memories available in future sessions — automatically, without any extra commands.
 
-Claude stores this automatically. You close Claude Code and come back the next day.
+There are two mechanisms at play:
 
-**Session 2** — a fresh session, but Claude remembers:
+**Passive storage** — every prompt you submit, every Claude response, and every tool call result is captured by a Claude Code hook and sent to the EverMemOS backend. Nothing is lost, and nothing requires action on your part.
 
-> *"What database did we decide on for the new project?"*
+**Active retrieval** — at the start of each new session, recent memories are fetched and injected directly into Claude's context. Mid-session, whenever you reference past events or ask about something discussed before, Claude searches the memory store and incorporates the results before replying.
+
+The practical effect: Claude carries context across sessions the same way a colleague does — it remembers past decisions, ongoing work, and the reasoning behind choices, even after you close and reopen Claude Code.
+
+**Example — decisions that survive across sessions:**
+
+You tell Claude in one session:
+
+> *"We chose PostgreSQL over MySQL because we need JSONB support for our metadata schema. Also, the API will be RESTful — we ruled out GraphQL after the team review."*
+
+You close Claude Code and open it the next day. In the new session:
+
+> *"What database are we using and why?"*
 >
-> Claude: *"You decided on PostgreSQL. You also noted the API should be RESTful rather than GraphQL."*
+> Claude: *"PostgreSQL — you chose it over MySQL specifically for JSONB support in your metadata schema. You also noted the API design is RESTful; GraphQL was ruled out after the team review."*
 
-**Another example** — referencing past work mid-session:
+Claude did not guess. It retrieved the exact reasoning you recorded.
+
+**Example — picking up mid-project without re-explaining:**
 
 > *"Continue where we left off with the auth module."*
 >
-> Claude automatically searches your memory, finds the previous discussion about the auth module, and picks up from there — without you having to re-explain the context.
+> Claude automatically searches your memory for prior auth discussions — past decisions, bugs fixed, approaches considered — and resumes from that point without you having to re-explain the context.
 
----
+This is the core value: the longer you use Claude Code with EverMemOS running, the richer the memory store becomes, and the less time you spend re-establishing context at the start of each session.
 
-## Advanced Usage
+### How memory works during a Claude Code session
+
+| Moment | What happens |
+|--------|-------------|
+| Session start | Recent memories are fetched and injected into Claude's context |
+| Every prompt you send | Your message is stored |
+| Every Claude reply | Claude's response is stored |
+| Every tool call | Tool name and result are stored |
+| Question references past context | Claude automatically searches memory and incorporates the results |
 
 ### What `install.sh` does
 
@@ -125,16 +200,6 @@ Three things start in order:
 ### Why `--restart` is required on resume
 
 When you stop and restart EverMemOS, the kv-server needs to re-sync your existing memory stream from the 0G blockchain before the backend can safely read from it. The `--restart` flag tells the start script to wait for that sync to complete. Depending on the size of your history, this can take anywhere from a few seconds to several minutes. On a first-time start (fresh stream, nothing to sync), the flag is not needed.
-
-### How memory works during a Claude Code session
-
-| Moment | What happens |
-|--------|-------------|
-| Session start | Recent memories are fetched and injected into Claude's context |
-| Every prompt you send | Your message is stored |
-| Every Claude reply | Claude's response is stored |
-| Every tool call | Tool name and result are stored |
-| Question references past context | Claude automatically searches memory and incorporates the results |
 
 ### Verify everything is running
 
