@@ -147,7 +147,7 @@ echo ""
 
 ZGS_KV_DIR="$SCRIPT_DIR/0g_kv_server"
 ZGS_KV_BIN="$ZGS_KV_DIR/zgs_kv"
-ZGS_KV_VERSION="v1.5.0"
+ZGS_KV_VERSION="v1.5.1"
 ZGS_KV_BASE="https://github.com/0gfoundation/0g-storage-kv/releases/download/${ZGS_KV_VERSION}"
 
 # Select the correct binary for the current OS
