@@ -55,6 +55,19 @@ if [ -z "$WALLET_KEY" ] || ! echo "$WALLET_KEY" | grep -qE '^[0-9a-fA-F]{64}$'; 
     exit 1
 fi
 
+# ── Update log_sync_start_block_number (fresh start only) ────────────────────
+# On a fresh start the stream has no data yet, so it is safe (and faster) to
+# begin syncing from the current chain tip instead of the block recorded at
+# install time, which may be millions of blocks in the past.
+# Skipped on --restart: the kv-server resumes from its local checkpoint and
+# must not lose the original start block in case local state needs rebuilding.
+if [ "$RESTART" = false ]; then
+    echo "▶  Updating log_sync_start_block_number to current block height..."
+    echo ""
+    python3 scripts/update_start_block.py
+    echo ""
+fi
+
 # ── Step 1a: Start kv-server in background ───────────────────────────────────
 echo "▶  Checking kv-server (zgs_kv)..."
 echo ""
