@@ -10,9 +10,10 @@ Memories are stored on the [0G decentralized storage network](https://0g.ai) —
 
 ### Prerequisites
 
-| | Ubuntu | macOS |
+| Requirement | Ubuntu | macOS |
 |---|---|---|
 | OS | Ubuntu 20.04+ | macOS 12+ |
+| [Claude Code](https://claude.ai/code) | must be installed | must be installed |
 | Python 3.8+ ¹ | typically pre-installed | typically pre-installed |
 | [Homebrew](https://brew.sh) | — | [Appendix A](#appendix-a-installing-homebrew-on-macos) |
 | Docker 20.10+ | auto-installed if missing | [Appendix B](#appendix-b-installing-docker-on-macos) |
@@ -46,28 +47,85 @@ ZEROG_WALLET_KEY=...      # EVM wallet private key funded with 0G testnet tokens
 
 ### 3. Start
 
+> **First run only:** Docker will pull ~4 GB of images (Elasticsearch, MongoDB, Milvus, Redis). This can take **5–15 minutes** depending on your connection. The terminal will show download progress — it is not hanging.
+
 ```bash
 ./start_service.sh
 ```
 
-> **First run only:** Docker will pull ~4 GB of images (Elasticsearch, MongoDB, Milvus, Redis). This can take **5–15 minutes** depending on your connection. The terminal will show download progress — it is not hanging.
+When startup completes successfully, you will see:
 
-> If Claude Code is already running, **restart it** now so the newly registered hooks take effect.
+```
+============================================================
+  ✅ EverMemOS is ready!
 
-### 4. Use Claude Code normally
+  API:      http://localhost:1995
+  Logs:     logs/evermemos_<timestamp>.log
+============================================================
+```
 
-EverMemOS runs silently in the background — no extra commands needed. You get:
+> If Claude Code is already running, **restart it** now so the hooks registered by `install.sh` take effect.
 
-- **Cross-session memory** — Claude remembers past conversations even after restarting
-- **Auto-injected context** — relevant memories are automatically added to Claude's context at the start of each session
-- **Automatic storage** — every message you send, every Claude reply, and every tool call result is stored without any action on your part
-- **Automatic search** — when you reference past events or ask about something discussed before, Claude automatically searches your memory store and incorporates the results
+### 4. Verify Memory Works — A 2-Minute Test
+
+EverMemOS runs silently in the background. The fastest way to confirm it is working is to plant a few facts, restart, and ask Claude to recall them.
+
+#### Step A — Seed session: tell Claude specific facts
+
+Open Claude Code and send this message (copy it exactly):
+
+```
+I want to record a few project decisions for later:
+1. We chose PostgreSQL over MySQL because we need JSONB support for our metadata schema.
+2. The auth bug was caused by JWT expiry being set in seconds instead of milliseconds.
+3. The API design is RESTful — we explicitly ruled out GraphQL after the team review.
+Please confirm you've noted these.
+```
+
+Claude will acknowledge. You do not need to do anything else — EverMemOS stores everything automatically.
+
+#### Step B — Close and reopen Claude Code
+
+Type `/exit` to quit Claude Code, then reopen it. This starts a fresh session with no conversation history.
+
+#### Step C — New session: ask Claude to recall
+
+Send these questions one at a time:
+
+```
+What database did we choose, and why?
+```
+
+```
+What was the root cause of the auth bug?
+```
+
+```
+What API style did we settle on?
+```
+
+**Expected results:**
+
+| Question | Claude should answer |
+|---|---|
+| Database choice | PostgreSQL — needed JSONB support for metadata schema |
+| Auth bug | JWT expiry was set in seconds instead of milliseconds |
+| API style | RESTful — GraphQL was ruled out after the team review |
+
+If Claude answers correctly with the specific details (JSONB, milliseconds, GraphQL ruled out), memory is working. If Claude says it has no memory of prior conversations, check [Verify everything is running](#verify-everything-is-running) in the Advanced Usage section.
 
 ### 5. Stop & Resume
 
+When you are done for the day:
+
 ```bash
 ./stop_service.sh
-./start_service.sh --restart   # always use --restart when resuming
+```
+
+When you come back and want to resume:
+
+```bash
+./start_service.sh --restart
 ```
 
 > `--restart` tells the script to wait for the kv-server to re-sync your memory stream from the blockchain before starting the backend. This can take **a few minutes** if your history is large.
@@ -75,34 +133,71 @@ EverMemOS runs silently in the background — no extra commands needed. You get:
 ### 6. Uninstall
 
 ```bash
-./uninstall.sh   # WARNING: permanently deletes all stored memories
+./uninstall.sh
+```
+
+> **Warning:** this permanently deletes all stored memories. Running `install.sh` again generates a new stream ID — **previous memories are not recoverable**.
+
+### Typical workflow
+
+```
+install.sh
+  └─ fill in .env
+       └─ start_service.sh                        ← first time (fresh stream)
+            └─ use Claude Code normally
+                 └─ stop_service.sh               ← data preserved
+                      └─ start_service.sh --restart   ← resume (re-sync chain)
+                           └─ ...
+                                └─ uninstall.sh   ← removes everything
 ```
 
 ---
 
-## What It Looks Like in Practice
+## Advanced Usage
 
-**Session 1** — you tell Claude something:
+### How EverMemOS works
 
-> *"I've decided to use PostgreSQL for the new project. We also agreed the API should be RESTful, not GraphQL."*
+EverMemOS intercepts every message you send and every reply Claude gives, stores them as structured memories, and makes those memories available in future sessions — automatically, without any extra commands.
 
-Claude stores this automatically. You close Claude Code and come back the next day.
+There are two mechanisms at play:
 
-**Session 2** — a fresh session, but Claude remembers:
+**Passive storage** — every prompt you submit, every Claude response, and every tool call result is captured by a Claude Code hook and sent to the EverMemOS backend. Nothing is lost, and nothing requires action on your part.
 
-> *"What database did we decide on for the new project?"*
+**Active retrieval** — at the start of each new session, recent memories are fetched and injected directly into Claude's context. Mid-session, whenever you reference past events or ask about something discussed before, Claude searches the memory store and incorporates the results before replying.
+
+The practical effect: Claude carries context across sessions the same way a colleague does — it remembers past decisions, ongoing work, and the reasoning behind choices, even after you close and reopen Claude Code.
+
+**Example — decisions that survive across sessions:**
+
+You tell Claude in one session:
+
+> *"We chose PostgreSQL over MySQL because we need JSONB support for our metadata schema. Also, the API will be RESTful — we ruled out GraphQL after the team review."*
+
+You close Claude Code and open it the next day. In the new session:
+
+> *"What database are we using and why?"*
 >
-> Claude: *"You decided on PostgreSQL. You also noted the API should be RESTful rather than GraphQL."*
+> Claude: *"PostgreSQL — you chose it over MySQL specifically for JSONB support in your metadata schema. You also noted the API design is RESTful; GraphQL was ruled out after the team review."*
 
-**Another example** — referencing past work mid-session:
+Claude did not guess. It retrieved the exact reasoning you recorded.
+
+**Example — picking up mid-project without re-explaining:**
 
 > *"Continue where we left off with the auth module."*
 >
-> Claude automatically searches your memory, finds the previous discussion about the auth module, and picks up from there — without you having to re-explain the context.
+> Claude automatically searches your memory for prior auth discussions — past decisions, bugs fixed, approaches considered — and resumes from that point without you having to re-explain the context.
 
----
+This is the core value: the longer you use Claude Code with EverMemOS running, the richer the memory store becomes, and the less time you spend re-establishing context at the start of each session.
 
-## Advanced Usage
+### How memory works during a Claude Code session
+
+| Moment | What happens |
+|--------|-------------|
+| Session start | Recent memories are fetched and injected into Claude's context |
+| Every prompt you send | Your message is stored |
+| Every Claude reply | Claude's response is stored |
+| Every tool call | Tool name and result are stored |
+| Question references past context (e.g. "last time", "previously", "continue where we left off") | Claude automatically searches memory and incorporates the results |
 
 ### What `install.sh` does
 
@@ -126,20 +221,13 @@ Three things start in order:
 
 When you stop and restart EverMemOS, the kv-server needs to re-sync your existing memory stream from the 0G blockchain before the backend can safely read from it. The `--restart` flag tells the start script to wait for that sync to complete. Depending on the size of your history, this can take anywhere from a few seconds to several minutes. On a first-time start (fresh stream, nothing to sync), the flag is not needed.
 
-### How memory works during a Claude Code session
-
-| Moment | What happens |
-|--------|-------------|
-| Session start | Recent memories are fetched and injected into Claude's context |
-| Every prompt you send | Your message is stored |
-| Every Claude reply | Claude's response is stored |
-| Every tool call | Tool name and result are stored |
-| Question references past context | Claude automatically searches memory and incorporates the results |
-
 ### Verify everything is running
 
+Run these from the `0g-memory` project directory:
+
 ```bash
-# All 6 Docker containers should show "Up" or "healthy"
+# Expect 6 containers: MongoDB, Elasticsearch, Redis, and Milvus
+# (Milvus spawns 3 sub-containers: standalone, etcd, and minio)
 docker compose ps
 
 # EverMemOS backend health check
@@ -148,15 +236,32 @@ curl http://localhost:1995/health
 
 # kv-server process
 pgrep -a zgs_kv
+# If running, outputs the PID and binary path, e.g.:
+#   12345 /home/user/0g-memory/0g_kv_server/zgs_kv --config ...
+# No output means the kv-server is not running.
 ```
 
 ### Logs
+
+All log commands below must be run from the `0g-memory` project directory.
 
 | Component | Command |
 |-----------|---------|
 | EverMemOS backend | `tail -f $(ls -t logs/evermemos_*.log \| head -1)` |
 | kv-server | `tail -f $(ls -t 0g_kv_server/kv_*.log \| head -1)` |
 | Hook activity | `tail -f ~/.claude/logs/hook_user_prompt.log` |
+
+To confirm the 2-minute test worked, run these after completing both the seed session and the recall session. You should see storage entries from the seed session and search entries from the recall session:
+
+```bash
+LOG=$(ls -t logs/evermemos_*.log | head -1)
+
+# Messages stored in the seed session
+grep "Memory request processing completed" "$LOG" | tail -5
+
+# Search calls triggered in the recall session
+grep "Received search request" "$LOG" | tail -5
+```
 
 Quick health check across all components:
 
@@ -188,19 +293,6 @@ Permanently removes:
 - EverMemOS hooks from `~/.claude/settings.json`
 
 > After uninstalling, running `install.sh` again generates a new stream ID and encryption key — **previous memories are not recoverable**.
-
-### Typical workflow
-
-```
-install.sh
-  └─ fill in .env
-       └─ start_service.sh                        ← first time (fresh stream)
-            └─ use Claude Code normally
-                 └─ stop_service.sh               ← data preserved
-                      └─ start_service.sh --restart   ← resume (re-sync chain)
-                           └─ ...
-                                └─ uninstall.sh   ← removes everything
-```
 
 ---
 
@@ -264,7 +356,7 @@ In MetaMask, go to **Settings → Networks → Add a network** and enter:
 
 #### Step 3 — Get free testnet tokens
 
-Ask the 0G admin to send testnet tokens to your wallet address.
+Contact the 0G admin (xinyu@0g.ai) and include your wallet address. They will send testnet tokens to it.
 
 #### Step 4 — Export the private key from MetaMask
 
