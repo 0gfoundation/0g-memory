@@ -11,9 +11,10 @@
 #   3. Installs Python dependencies (uv sync)
 #   4. Verifies Docker is installed, creates .env from template
 #   5. Copies EverMemOS skills to ~/.claude/skills/ and merges hooks into ~/.claude/settings.json
-#   6. Generates .0g_secrets (stream_id + encryption_key)
-#   7. Writes stream_id + encryption_key into kv-server config
-#   8. Downloads zgs_kv binary and places it in 0g_kv_server/
+#   6. Fetches current block height and sets log_sync_start_block_number in kv-server config
+#   7. Generates .0g_secrets (stream_id + encryption_key)
+#   8. Writes stream_id + encryption_key into kv-server config
+#   9. Downloads zgs_kv binary and places it in 0g_kv_server/
 #
 # To start services after installation, run: ./start_service.sh
 
@@ -66,7 +67,13 @@ echo "▶  Running setup..."
 echo ""
 python3 scripts/setup.py "$@"
 
-# ── Step 6: Generate .0g_secrets (stream_id + encryption_key) ───────────────
+# ── Step 6: Fetch block height → log_sync_start_block_number ─────────────────
+echo ""
+echo "▶  Fetching current block height from 0G testnet..."
+echo ""
+python3 scripts/update_start_block.py --copy-example
+
+# ── Step 7: Generate .0g_secrets (stream_id + encryption_key) ───────────────
 echo ""
 echo "▶  Generating 0G secrets (.0g_secrets)..."
 echo ""
@@ -106,7 +113,7 @@ if changed:
     print("  💾 Saved to .0g_secrets")
 EOF
 
-# ── Step 7: Write stream_id + encryption_key into kv-server config ───────────
+# ── Step 8: Write stream_id + encryption_key into kv-server config ───────────
 echo ""
 echo "▶  Updating kv-server config (config_testnet_turbo.toml)..."
 echo ""
@@ -133,14 +140,14 @@ if [ -f "$KV_CONFIG" ]; then
     echo "  ✅ stream_ids and encryption_key written to $KV_CONFIG"
 fi
 
-# ── Step 8: Download zgs_kv binary ───────────────────────────────────────────
+# ── Step 9: Download zgs_kv binary ───────────────────────────────────────────
 echo ""
 echo "▶  Downloading zgs_kv binary..."
 echo ""
 
 ZGS_KV_DIR="$SCRIPT_DIR/0g_kv_server"
 ZGS_KV_BIN="$ZGS_KV_DIR/zgs_kv"
-ZGS_KV_VERSION="v1.5.0"
+ZGS_KV_VERSION="v1.5.1"
 ZGS_KV_BASE="https://github.com/0gfoundation/0g-storage-kv/releases/download/${ZGS_KV_VERSION}"
 
 # Select the correct binary for the current OS
