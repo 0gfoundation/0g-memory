@@ -18,7 +18,7 @@ This plugin integrates [EverMemOS](https://github.com/0gfoundation/0g-memory) wi
 
 ## Configuration
 
-Set these environment variables (configured automatically by `install.sh`):
+The plugin uses sensible defaults and works out of the box. To override, set these environment variables in your shell profile (`~/.bashrc` or `~/.zshrc`):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
