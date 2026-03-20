@@ -136,13 +136,16 @@ class OpenAIProvider(LLMProvider):
                         # print(response_data)
                         # Handle error responses
                         if response.status != 200:
-                            error_msg = response_data.get('error', {}).get(
-                                'message', f"HTTP {response.status}"
-                            )
+                            error_info = response_data.get('error', f"HTTP {response.status}") if isinstance(response_data, dict) else response_data
+                            if isinstance(error_info, dict):
+                                error_msg = error_info.get('message', f"HTTP {response.status}")
+                            else:
+                                error_msg = str(error_info)
                             logger.error(
                                 f"❌ [OpenAI-{self.model}] HTTP error {response.status}:"
                             )
                             logger.error(f"   💬 Error message: {error_msg}")
+                            logger.error(f"   📄 Full response: {response_data}")
                             # Debug: 429 Too Many Requests breakpoint debugging
                             if response.status == 429:
                                 logger.warning(
