@@ -714,6 +714,25 @@ class SetupManager:
             self.print_error(f"Failed to write settings.json: {e}")
             return False
 
+    def is_claude_code_installed(self) -> bool:
+        """Check if Claude Code is installed: binary in PATH or ~/.claude/ exists."""
+        if shutil.which("claude"):
+            return True
+        if (Path.home() / ".claude").exists():
+            return True
+        return False
+
+    def is_opencode_installed(self) -> bool:
+        """Check if OpenCode is installed: binary in PATH, ~/.config/opencode/ exists,
+        or the official installer location (~/.opencode/bin/opencode) exists."""
+        if shutil.which("opencode"):
+            return True
+        if (Path.home() / ".config" / "opencode").exists():
+            return True
+        if (Path.home() / ".opencode" / "bin" / "opencode").exists():
+            return True
+        return False
+
     def install_opencode_plugin(self) -> bool:
         """
         Copy EverMemOS plugin to ~/.config/opencode/plugins/ and register it
@@ -722,20 +741,6 @@ class SetupManager:
         Safe to run multiple times — already-configured entries are skipped.
         """
         self.print_header("Installing OpenCode Integration")
-
-        # ── Check if opencode is installed ───────────────────────────────────
-        opencode_bin = shutil.which("opencode")
-        if not opencode_bin:
-            # Also check common install location used by the official installer
-            alt = Path.home() / ".opencode" / "bin" / "opencode"
-            if alt.exists():
-                opencode_bin = str(alt)
-            else:
-                self.print_warning("opencode not found in PATH, skipping OpenCode integration")
-                self.print_info("Install OpenCode: curl -fsSL https://opencode.ai/install | bash")
-                return False
-
-        self.print_info(f"Found opencode at: {opencode_bin}")
 
         # ── Step 1: Copy plugin directory ────────────────────────────────────
         plugin_src = self.project_dir / "opencode-skills" / "evermemos"
@@ -831,19 +836,32 @@ class SetupManager:
         if not self.setup_docker_compose(non_interactive=non_interactive):
             return False
 
-        # Step 5: Install skills + hooks into Claude Code global config
-        if not self.install_claude_hooks():
-            self.print_warning(
-                "Claude Code hook installation failed — "
-                "hooks won't auto-record across all projects. "
-                "You can re-run setup to retry."
+        # Step 5: Install Claude Code integration (if Claude Code is installed)
+        if self.is_claude_code_installed():
+            if not self.install_claude_hooks():
+                self.print_warning(
+                    "Claude Code hook installation failed — "
+                    "hooks won't auto-record across all projects. "
+                    "You can re-run setup to retry."
+                )
+        else:
+            self.print_info(
+                "Claude Code not detected ('claude' not in PATH and ~/.claude/ not found), "
+                "skipping Claude Code integration."
             )
 
-        # Step 6: Install plugin into OpenCode global config (optional)
-        if not self.install_opencode_plugin():
-            self.print_warning(
-                "OpenCode plugin installation skipped or failed — "
-                "install OpenCode first, then re-run setup to enable it."
+        # Step 6: Install OpenCode integration (if OpenCode is installed)
+        if self.is_opencode_installed():
+            if not self.install_opencode_plugin():
+                self.print_warning(
+                    "OpenCode plugin installation failed — "
+                    "you can re-run setup to retry."
+                )
+        else:
+            self.print_info(
+                "OpenCode not detected ('opencode' not in PATH, ~/.config/opencode/ and "
+                "~/.opencode/bin/opencode not found), skipping OpenCode integration. "
+                "Install OpenCode first, then re-run setup to enable it."
             )
 
         return True
