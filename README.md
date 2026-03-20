@@ -1,6 +1,8 @@
-# EverMemOS — Claude Code Integration
+# EverMemOS — Persistent Memory for AI Coding Assistants
 
-EverMemOS gives Claude Code persistent memory across sessions. Every conversation is stored, indexed, and automatically retrieved on the next session start.
+EverMemOS gives your AI coding assistant persistent memory across sessions. Every conversation is stored, indexed, and automatically retrieved on the next session start.
+
+Supported clients: **Claude Code** and **OpenCode**. `install.sh` detects which are installed and sets up the integration automatically.
 
 Memories are stored on the [0G decentralized storage network](https://0g.ai) — encrypted with a key only you hold, persisted on-chain so data survives hardware failures, and never held by any central server.
 
@@ -13,7 +15,7 @@ Memories are stored on the [0G decentralized storage network](https://0g.ai) —
 | Requirement | Ubuntu | macOS |
 |---|---|---|
 | OS | Ubuntu 20.04+ | macOS 12+ |
-| [Claude Code](https://claude.ai/code) | must be installed | must be installed |
+| [Claude Code](https://claude.ai/code) and/or [OpenCode](https://opencode.ai) | at least one must be installed | at least one must be installed |
 | Python 3.8+ ¹ | typically pre-installed | typically pre-installed |
 | [Homebrew](https://brew.sh) | — | [Appendix A](#appendix-a-installing-homebrew-on-macos) |
 | Docker 20.10+ | auto-installed if missing | [Appendix B](#appendix-b-installing-docker-on-macos) |
@@ -289,8 +291,8 @@ grep "sender_name=Claude (Tool)"     "$LOG" | wc -l
 Permanently removes:
 - Docker containers and all volumes (MongoDB, Elasticsearch, Milvus, Redis data)
 - `.0g_secrets`, `.env`, `.venv/`
-- EverMemOS skills from `~/.claude/skills/`
-- EverMemOS hooks from `~/.claude/settings.json`
+- EverMemOS skills from `~/.claude/skills/` and hooks from `~/.claude/settings.json`
+- EverMemOS plugin from `~/.config/opencode/plugins/` and entry from `~/.config/opencode/opencode.json`
 
 > After uninstalling, running `install.sh` again generates a new stream ID and encryption key — **previous memories are not recoverable**.
 
