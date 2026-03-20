@@ -1,0 +1,9 @@
+{
+  "name": "evermemos-opencode-plugin",
+  "version": "1.0.0",
+  "description": "EverMemOS persistent memory integration plugin for OpenCode",
+  "module": "src/index.ts",
+  "dependencies": {
+    "@opencode-ai/plugin": "latest"
+  }
+}
