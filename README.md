@@ -19,7 +19,7 @@ Three layers work together to deliver forever-persistent memory:
 Raw conversation data is processed by [EverMemOS](https://github.com/0gfoundation/0g-memory), an open-source memory system that extracts structured episodic memories, indexes them across MongoDB, Elasticsearch, Milvus, and Redis, and supports keyword, vector, hybrid, and agentic retrieval. Each project directory gets its own isolated memory namespace, so different codebases don't mix.
 
 **3. Decentralized persistence via 0G storage**
-This is what makes memory truly permanent. A local `zgs_kv` node (the [0G KV server](https://docs.0g.ai/concepts/storage)) runs alongside EverMemOS and continuously writes your memory stream to the 0G decentralized network. Every memory is encrypted with a key generated at install time and stored only on your machine — no one else can read it. Because data lives on-chain, it survives local hardware failures. When you restart EverMemOS on a new machine, the kv-server re-syncs your full history from the blockchain and restores everything.
+This is what makes memory truly permanent. The memory system writes every memory to the [0G decentralized network](https://docs.0g.ai/concepts/storage) via the 0G storage SDK. Every memory is encrypted with a key generated at install time and stored only on your machine — no one else can read it. A local `zgs_kv` node runs as a read cache, syncing your memory stream from the blockchain so reads stay fast. Because data lives on-chain, it survives local hardware failures — when you restart on a new machine, the kv-server re-syncs your full history from the blockchain and restores everything.
 
 ---
 
