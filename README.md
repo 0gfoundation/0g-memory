@@ -1,8 +1,25 @@
-# EverMemOS — Claude Code Integration
+# Forever Persistent AI Agent Memory with 0G Storage
 
-EverMemOS gives Claude Code persistent memory across sessions. Every conversation is stored, indexed, and automatically retrieved on the next session start.
+This project gives your AI agent memory that lasts forever. Every conversation — every prompt, response, and tool call — is automatically captured and retrieved in future sessions, with no extra effort from you. As a first example, we integrate with AI coding assistants so that your coding agent remembers past decisions, ongoing work, and tool call results across sessions.
 
-Memories are stored on the [0G decentralized storage network](https://0g.ai) — encrypted with a key only you hold, persisted on-chain so data survives hardware failures, and never held by any central server.
+Unlike memory systems that rely on local storage, your memories here are stored on the [0G decentralized storage network](https://docs.0g.ai/concepts/storage), encrypted with a key only you hold, and persisted on-chain. Your memory survives hardware failures and is never held by any central server.
+
+The currently supported AI coding assistant is **Claude Code**, with more integrations on the roadmap.
+
+---
+
+## How it works
+
+Three layers work together to deliver forever-persistent memory:
+
+**1. Automatic capture via Claude Code hooks**
+`install.sh` registers hooks into Claude Code's global settings. From that point on, every prompt you send, every Claude response, and every tool call result is silently captured — no commands needed. At the start of each new session, recent memories are injected into Claude's context automatically. Mid-session, when you reference past events, Claude searches the memory store and incorporates the results before replying.
+
+**2. Structured memory extraction via EverMemOS**
+Raw conversation data is processed by [EverMemOS](https://github.com/0gfoundation/0g-memory), an open-source memory system that extracts structured episodic memories, indexes them across MongoDB, Elasticsearch, Milvus, and Redis, and supports keyword, vector, hybrid, and agentic retrieval. Each project directory gets its own isolated memory namespace, so different codebases don't mix.
+
+**3. Decentralized persistence via 0G storage**
+This is what makes memory truly permanent. A local `zgs_kv` node (the [0G KV server](https://docs.0g.ai/concepts/storage)) runs alongside EverMemOS and continuously writes your memory stream to the 0G decentralized network. Every memory is encrypted with a key generated at install time and stored only on your machine — no one else can read it. Because data lives on-chain, it survives local hardware failures. When you restart EverMemOS on a new machine, the kv-server re-syncs your full history from the blockchain and restores everything.
 
 ---
 
@@ -68,7 +85,7 @@ When startup completes successfully, you will see:
 
 ### 4. Verify Memory Works — A 2-Minute Test
 
-EverMemOS runs silently in the background. The fastest way to confirm it is working is to plant a few facts, restart, and ask Claude to recall them.
+The memory backend runs silently in the background. The fastest way to confirm it is working is to plant a few facts, restart, and ask Claude to recall them.
 
 #### Step A — Seed session: tell Claude specific facts
 
@@ -82,7 +99,7 @@ I want to record a few project decisions for later:
 Please confirm you've noted these.
 ```
 
-Claude will acknowledge. You do not need to do anything else — EverMemOS stores everything automatically.
+Claude will acknowledge. You do not need to do anything else — everything is stored automatically.
 
 #### Step B — Close and reopen Claude Code
 
@@ -155,13 +172,13 @@ install.sh
 
 ## Advanced Usage
 
-### How EverMemOS works
+### How the memory system works
 
-EverMemOS intercepts every message you send and every reply Claude gives, stores them as structured memories, and makes those memories available in future sessions — automatically, without any extra commands.
+The memory backend intercepts every message you send and every reply Claude gives, stores them as structured memories, and makes those memories available in future sessions — automatically, without any extra commands.
 
 There are two mechanisms at play:
 
-**Passive storage** — every prompt you submit, every Claude response, and every tool call result is captured by a Claude Code hook and sent to the EverMemOS backend. Nothing is lost, and nothing requires action on your part.
+**Passive storage** — every prompt you submit, every Claude response, and every tool call result is captured by a Claude Code hook and sent to the memory backend. Nothing is lost, and nothing requires action on your part.
 
 **Active retrieval** — at the start of each new session, recent memories are fetched and injected directly into Claude's context. Mid-session, whenever you reference past events or ask about something discussed before, Claude searches the memory store and incorporates the results before replying.
 
@@ -187,7 +204,7 @@ Claude did not guess. It retrieved the exact reasoning you recorded.
 >
 > Claude automatically searches your memory for prior auth discussions — past decisions, bugs fixed, approaches considered — and resumes from that point without you having to re-explain the context.
 
-This is the core value: the longer you use Claude Code with EverMemOS running, the richer the memory store becomes, and the less time you spend re-establishing context at the start of each session.
+This is the core value: the longer you use Claude Code, the richer the memory store becomes, and the less time you spend re-establishing context at the start of each session.
 
 ### How memory works during a Claude Code session
 
@@ -336,7 +353,7 @@ Wait for the Docker whale icon to appear in the menu bar and show **"Docker Desk
 
 ### Appendix C: Getting Your `ZEROG_WALLET_KEY`
 
-`ZEROG_WALLET_KEY` is the 64-character hex private key of an EVM wallet. EverMemOS uses it to write your encrypted memories to the [0G decentralized storage network](https://0g.ai). This project uses the **0G Galileo Testnet**, so you need a wallet funded with free testnet tokens.
+`ZEROG_WALLET_KEY` is the 64-character hex private key of an EVM wallet. It is used by this memory system when calling the 0G storage SDK to write your encrypted memories to the [0G decentralized storage network](https://docs.0g.ai/concepts/storage). This project uses the **0G Galileo Testnet**, so you need a wallet funded with free testnet tokens.
 
 #### Step 1 — Get a wallet (MetaMask)
 
