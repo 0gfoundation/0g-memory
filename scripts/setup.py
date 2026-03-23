@@ -877,24 +877,73 @@ class SetupManager:
         except (subprocess.TimeoutExpired, OSError) as e:
             self.print_warning(f"'openclaw plugins enable' failed: {e} — you may need to enable manually")
 
-        # ── Step 3: Remind user to configure and restart ──────────────────────
-        self.print_info(
-            "OpenClaw EverMemOS plugin installed. "
-            "To complete setup, add this to your ~/.openclaw/openclaw.json5 if not already present:\n"
-            "  plugins: {\n"
-            "    entries: {\n"
-            "      \"evermemos-openclaw\": {\n"
-            "        enabled: true,\n"
-            "        config: {\n"
-            "          apiBaseUrl: \"http://localhost:1995\",\n"
-            "          userId: \"openclaw_user\",\n"
-            "          searchTopK: 5\n"
-            "        }\n"
-            "      }\n"
-            "    }\n"
-            "  }\n"
-            "Then restart the OpenClaw gateway: openclaw gateway restart"
-        )
+        # ── Step 3: Patch ~/.openclaw/openclaw.json with plugin config ───────
+        config_path = Path.home() / ".openclaw" / "openclaw.json"
+
+        config: dict = {}
+        if config_path.exists():
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+            except (json.JSONDecodeError, OSError) as e:
+                self.print_warning(f"Could not read {config_path}: {e}, will recreate")
+                config = {}
+
+        plugin_id = "evermemos-openclaw"
+        plugin_config_block = {
+            "apiBaseUrl": "http://localhost:1995",
+            "userId": "openclaw_user",
+            "searchTopK": 5,
+        }
+
+        plugins = config.setdefault("plugins", {})
+        entries = plugins.setdefault("entries", {})
+
+        if plugin_id not in entries:
+            entries[plugin_id] = {"enabled": True, "config": plugin_config_block}
+            self.print_success(f"Added plugins.entries.{plugin_id} to openclaw.json")
+        else:
+            entry = entries[plugin_id]
+            patched = False
+            if not entry.get("enabled"):
+                entry["enabled"] = True
+                self.print_success(f"Set plugins.entries.{plugin_id}.enabled = true")
+                patched = True
+            if "config" not in entry:
+                entry["config"] = plugin_config_block
+                self.print_success(f"Added missing config block to plugins.entries.{plugin_id}")
+                patched = True
+            if not patched:
+                self.print_info(f"plugins.entries.{plugin_id} already configured, skipping")
+
+        load = plugins.setdefault("load", {})
+        paths: list = load.setdefault("paths", [])
+        plugin_path = str(plugin_src)
+        if plugin_path not in paths:
+            paths.append(plugin_path)
+            self.print_success(f"Added {plugin_path} to plugins.load.paths")
+        else:
+            self.print_info("plugins.load.paths already contains plugin path, skipping")
+
+        try:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = config_path.with_suffix(".json.tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+                f.write("\n")
+            tmp.replace(config_path)
+            self.print_success("Updated ~/.openclaw/openclaw.json")
+        except OSError as e:
+            self.print_warning(f"Failed to write openclaw.json: {e}")
+            self.print_info(
+                "Please manually add to ~/.openclaw/openclaw.json:\n"
+                f'  "plugins": {{"entries": {{"{plugin_id}": {{"enabled": true, '
+                f'"config": {{"apiBaseUrl": "http://localhost:1995", '
+                f'"userId": "openclaw_user", "searchTopK": 5}}}}}}}}'
+            )
+            return False
+
+        self.print_info("Restart the OpenClaw gateway to apply: openclaw gateway restart")
         return True
 
     def run_setup(self, non_interactive: bool = False) -> bool:
