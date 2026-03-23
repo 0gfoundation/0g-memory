@@ -714,6 +714,93 @@ class SetupManager:
             self.print_error(f"Failed to write settings.json: {e}")
             return False
 
+    def is_claude_code_installed(self) -> bool:
+        """Check if Claude Code is installed: binary in PATH or ~/.claude/ exists."""
+        if shutil.which("claude"):
+            return True
+        if (Path.home() / ".claude").exists():
+            return True
+        return False
+
+    def is_opencode_installed(self) -> bool:
+        """Check if OpenCode is installed: binary in PATH, ~/.config/opencode/ exists,
+        or the official installer location (~/.opencode/bin/opencode) exists."""
+        if shutil.which("opencode"):
+            return True
+        if (Path.home() / ".config" / "opencode").exists():
+            return True
+        if (Path.home() / ".opencode" / "bin" / "opencode").exists():
+            return True
+        return False
+
+    def install_opencode_plugin(self) -> bool:
+        """
+        Copy EverMemOS plugin to ~/.config/opencode/plugins/ and register it
+        in ~/.config/opencode/opencode.json (global, applies to all projects).
+
+        Safe to run multiple times — already-configured entries are skipped.
+        """
+        self.print_header("Installing OpenCode Integration")
+
+        # ── Step 1: Copy plugin directory ────────────────────────────────────
+        plugin_src = self.project_dir / "opencode-skills" / "evermemos"
+        plugin_dst = Path.home() / ".config" / "opencode" / "plugins" / "evermemos"
+
+        if not plugin_src.exists():
+            self.print_warning(f"opencode-skills/evermemos/ not found at {plugin_src}, skipping")
+            return False
+
+        if plugin_dst.exists():
+            shutil.rmtree(plugin_dst)
+        shutil.copytree(plugin_src, plugin_dst)
+        self.print_success(f"Installed plugin: ~/.config/opencode/plugins/evermemos/")
+
+        # ── Step 2: Merge into ~/.config/opencode/opencode.json ──────────────
+        config_path = Path.home() / ".config" / "opencode" / "opencode.json"
+
+        config: dict = {}
+        if config_path.exists():
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+            except (json.JSONDecodeError, OSError) as e:
+                self.print_warning(f"Could not read {config_path}: {e}, will recreate")
+                config = {}
+
+        # Ensure $schema is present
+        config.setdefault("$schema", "https://opencode.ai/config.json")
+
+        # NOTE: OpenCode does not support an "env" key in opencode.json.
+        # Remove it if a previous install accidentally wrote it.
+        config.pop("env", None)
+
+        # Environment variables (API_BASE_URL, EVERMEMOS_USER_ID) are read
+        # from the shell environment. The plugin uses sensible defaults:
+        #   API_BASE_URL       → http://localhost:1995
+        #   EVERMEMOS_USER_ID  → opencode_user
+
+        # Register plugin using absolute path (tilde is not always resolved by OpenCode)
+        plugin_entry = f"file://{Path.home()}/.config/opencode/plugins/evermemos/src/index.ts"
+        if "plugin" not in config:
+            config["plugin"] = []
+        if plugin_entry not in config["plugin"]:
+            config["plugin"].append(plugin_entry)
+            self.print_success("Registered EverMemOS plugin in opencode.json")
+        else:
+            self.print_info("EverMemOS plugin already registered, skipping")
+
+        # Write back
+        try:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+                f.write("\n")
+            self.print_success("Updated ~/.config/opencode/opencode.json")
+            return True
+        except OSError as e:
+            self.print_error(f"Failed to write opencode.json: {e}")
+            return False
+
     def run_setup(self, non_interactive: bool = False) -> bool:
         """Run complete setup process"""
         self.print_header("EverMemOS Setup")
@@ -749,12 +836,32 @@ class SetupManager:
         if not self.setup_docker_compose(non_interactive=non_interactive):
             return False
 
-        # Step 5: Install skills + hooks into Claude Code global config
-        if not self.install_claude_hooks():
-            self.print_warning(
-                "Claude Code hook installation failed — "
-                "hooks won't auto-record across all projects. "
-                "You can re-run setup to retry."
+        # Step 5: Install Claude Code integration (if Claude Code is installed)
+        if self.is_claude_code_installed():
+            if not self.install_claude_hooks():
+                self.print_warning(
+                    "Claude Code hook installation failed — "
+                    "hooks won't auto-record across all projects. "
+                    "You can re-run setup to retry."
+                )
+        else:
+            self.print_info(
+                "Claude Code not detected ('claude' not in PATH and ~/.claude/ not found), "
+                "skipping Claude Code integration."
+            )
+
+        # Step 6: Install OpenCode integration (if OpenCode is installed)
+        if self.is_opencode_installed():
+            if not self.install_opencode_plugin():
+                self.print_warning(
+                    "OpenCode plugin installation failed — "
+                    "you can re-run setup to retry."
+                )
+        else:
+            self.print_info(
+                "OpenCode not detected ('opencode' not in PATH, ~/.config/opencode/ and "
+                "~/.opencode/bin/opencode not found), skipping OpenCode integration. "
+                "Install OpenCode first, then re-run setup to enable it."
             )
 
         return True

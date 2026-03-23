@@ -164,6 +164,51 @@ else:
     print("  ✅ Updated ~/.claude/settings.json")
 EOF
 
+# ── OpenCode plugin removal ───────────────────────────────────────────────────
+echo ""
+echo "▶  Removing EverMemOS plugin from ~/.config/opencode/..."
+
+# Remove plugin directory
+OPENCODE_PLUGIN_DIR="$HOME/.config/opencode/plugins/evermemos"
+if [ -d "$OPENCODE_PLUGIN_DIR" ]; then
+    rm -rf "$OPENCODE_PLUGIN_DIR"
+    echo "  ✅ Deleted $OPENCODE_PLUGIN_DIR"
+else
+    echo "  ℹ️  $OPENCODE_PLUGIN_DIR not found, skipping"
+fi
+
+# Remove plugin entry from ~/.config/opencode/opencode.json
+python3 - <<'EOF'
+import json
+from pathlib import Path
+
+config_path = Path.home() / ".config" / "opencode" / "opencode.json"
+if not config_path.exists():
+    print("  ℹ️  ~/.config/opencode/opencode.json not found, skipping")
+    exit(0)
+
+with open(config_path, "r", encoding="utf-8") as f:
+    config = json.load(f)
+
+plugins = config.get("plugin", [])
+evermemos_entries = [p for p in plugins if "evermemos" in p]
+if not evermemos_entries:
+    print("  ℹ️  No EverMemOS plugin entry found in opencode.json, skipping")
+    exit(0)
+
+config["plugin"] = [p for p in plugins if "evermemos" not in p]
+if not config["plugin"]:
+    del config["plugin"]
+
+with open(config_path, "w", encoding="utf-8") as f:
+    json.dump(config, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+
+for entry in evermemos_entries:
+    print(f"  ✅ Removed plugin entry: {entry}")
+print("  ✅ Updated ~/.config/opencode/opencode.json")
+EOF
+
 # ── Step 6a (reverse): Remove EverMemOS skills from ~/.claude/skills/ ─────────
 echo ""
 echo "▶  Removing EverMemOS skills from ~/.claude/skills/..."
@@ -232,5 +277,8 @@ echo "  ✅ Uninstall complete!"
 echo ""
 echo "  ⚠️  If Claude Code is running, restart it so the"
 echo "     removed hooks take effect."
+echo ""
+echo "  ⚠️  If OpenCode is running, restart it so the"
+echo "     removed plugin takes effect."
 echo "============================================================"
 echo ""
