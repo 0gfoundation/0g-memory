@@ -110,7 +110,7 @@ for line in sys.stdin:
     data = d.get('data', {})
     ts   = d['ts'][11:19]
     text = data.get('injected_text', '')
-    print(f\"[{ts}] sess_ok={data.get('session_injected')} qry_ok={data.get('query_injected')}\")
+    print(f\"[{ts}] qry_ok={data.get('query_injected')}\")
     if text:
         print(text)
     else:

@@ -26,7 +26,6 @@ interface PluginConfig {
   baseUrl: string
   userId: string
   searchTopK: number
-  maxSessionInjectionChars: number
 }
 
 function resolveConfig(pluginConfig: Record<string, unknown> | undefined): PluginConfig {
@@ -34,7 +33,6 @@ function resolveConfig(pluginConfig: Record<string, unknown> | undefined): Plugi
     baseUrl: String(pluginConfig?.apiBaseUrl ?? process.env.API_BASE_URL ?? "http://localhost:1995").replace(/\/$/, ""),
     userId: String(pluginConfig?.userId ?? process.env.EVERMEMOS_USER_ID ?? "openclaw_user"),
     searchTopK: Number(pluginConfig?.searchTopK ?? 5),
-    maxSessionInjectionChars: Number(pluginConfig?.maxSessionInjectionChars ?? 6000),
   }
 }
 
@@ -141,57 +139,6 @@ async function apiStoreMessage(
   if (!res.ok) throw new Error(`Store failed: HTTP ${res.status}`)
 }
 
-async function apiFetchRecentMemories(
-  baseUrl: string,
-  userId: string,
-  groupId: string,
-  limit = 50,
-): Promise<any> {
-  const params = new URLSearchParams({
-    user_id: userId,
-    group_id: groupId,
-    memory_type: "episodic_memory",
-    limit: String(limit),
-    sort_order: "desc",
-  })
-  const res = await fetch(`${baseUrl}/api/v1/memories?${params}`, {
-    signal: AbortSignal.timeout(10_000),
-  })
-  if (!res.ok) throw new Error(`FetchRecent failed: HTTP ${res.status}`)
-  return res.json()
-}
-
-// ─── Formatters ───────────────────────────────────────────────────────────────
-
-function formatSessionMemories(memories: any[], pendingMessages: any[], maxChars: number): string {
-  if (!memories.length && !pendingMessages.length) return ""
-
-  const lines: string[] = ["# 📚 Recent Memory Context\n"]
-
-  if (memories.length > 0) {
-    lines.push("## Recent Conversations:\n")
-    for (const mem of memories.slice(0, 15)) {
-      const ts = mem.timestamp ?? mem.start_time ?? mem.created_at ?? "?"
-      const title: string = mem.title ?? mem.subject ?? "Untitled"
-      const body: string = mem.episode ?? mem.summary ?? ""
-      lines.push(`**[${ts}]** ${title}`)
-      if (body) lines.push(`  ${body}\n`)
-    }
-  }
-
-  if (pendingMessages.length > 0) {
-    lines.push("## Recent Messages (Pending):\n")
-    for (const msg of pendingMessages.slice(0, 100)) {
-      const ts = msg.message_create_time ?? msg.created_at ?? "?"
-      const content = String(msg.content ?? "").slice(0, 1000)
-      lines.push(`**[${ts}]** ${content}\n`)
-    }
-  }
-
-  lines.push("\n---")
-  const result = lines.join("\n")
-  return result.length > maxChars ? result.slice(0, maxChars) + "\n...(truncated)" : result
-}
 
 function formatSearchResults(memoriesGroups: any[], query: string): string {
   const allMems: any[] = []
@@ -240,18 +187,10 @@ function formatToolObservation(toolName: string, params: unknown, result: unknow
 
 // ─── In-memory caches ─────────────────────────────────────────────────────────
 
-// sessionId → formatted session memories (loaded lazily at first before_prompt_build)
-const sessionMemoryCache = new Map<string, string>()
-
-// sessionId → true once memories have been successfully requested for this session.
-// Only set AFTER a health check passes so that a temporarily-unavailable service
-// does not permanently suppress memory loading for the session.
-const sessionLoadedSet = new Set<string>()
-
-// sessionId → groupId: set at before_prompt_build (has workspaceDir), used by llm_output + after_tool_call
+// sessionId → groupId: set at before_prompt_build, used by llm_output + after_tool_call
 const groupIdBySession = new Map<string, string>()
 
-// channelId → groupId: set at before_prompt_build, kept for session_end cleanup bookkeeping
+// channelId → groupId: used in session_end to identify which channel caches to clean up
 const groupIdByChannel = new Map<string, string>()
 
 // channelId → formatted search results: written by before_prompt_build, read on the next turn
@@ -259,8 +198,6 @@ const queryResultCache = new Map<string, string>()
 
 // channelId → raw user message content buffered by message_received.
 // Flushed (stored + searched) in before_prompt_build where the correct groupId is known.
-// This prevents the first user message from being written to the channel-level namespace
-// instead of the workspace-level namespace.
 const pendingUserMessage = new Map<string, string>()
 
 // ─── Plugin ───────────────────────────────────────────────────────────────────
@@ -271,7 +208,7 @@ export default {
   description: "Persistent memory integration via EverMemOS + 0G chain storage",
 
   register(api: OpenClawPluginApi) {
-    // ── before_prompt_build: lazy-load memories + flush pending user message + inject ──
+    // ── before_prompt_build: store user message + per-message search + inject ──
     api.on("before_prompt_build", async (event, ctx) => {
       const cfg = resolveConfig(api.pluginConfig)
       const sessionId = ctx.sessionId
@@ -299,118 +236,61 @@ export default {
       // Single health check for this hook invocation
       const available = await isServiceAvailable(cfg.baseUrl)
 
-      // ── Task A: lazy-load session memories (first turn only, service must be available) ──
-      // sessionLoadedSet is only set AFTER the health check succeeds, so a temporarily
-      // unavailable service will be retried on the next turn rather than being skipped forever.
-      const needsSessionLoad = !!sessionId && !sessionLoadedSet.has(sessionId) && available
-      if (needsSessionLoad) {
-        // Mark synchronously (before any await) to prevent a second concurrent before_prompt_build
-        // for the same session from triggering a duplicate load
-        sessionLoadedSet.add(sessionId!)
-      }
-
-      // ── Task B: store user message + search memories with correct groupId ────
+      // ── Store user message + search memories with correct groupId ─────────────
+      // OpenClaw maintains its own session history, so recent-memory injection is
+      // unnecessary here (unlike Claude Code / OpenCode where each launch is a fresh
+      // process).  Only per-message semantic search is injected.
+      //
       // Consume (delete) the pending message only when we are actually going to store it.
       // If the service is unavailable, leave it in the map so the next turn can retry.
       const needsStoreSearch = pendingContent !== undefined && available
       if (needsStoreSearch && channelId) pendingUserMessage.delete(channelId)
 
-      // Run both tasks concurrently when applicable
-      const tasks: Promise<void>[] = []
-
-      if (needsSessionLoad) {
-        tasks.push(
-          (async () => {
-            let memories: any[] = []
-            let pendingMessages: any[] = []
-            try {
-              const res = await apiFetchRecentMemories(cfg.baseUrl, cfg.userId, groupId, 50)
-              memories = res?.result?.memories ?? []
-            } catch (e) {
-              log("ERROR", "before_prompt_build", "apiFetchRecentMemories failed", String(e))
-            }
-            try {
-              const res = await apiSearchMemories(cfg.baseUrl, cfg.userId, groupId, "", cfg.searchTopK)
-              pendingMessages = res?.result?.pending_messages ?? []
-            } catch (e) {
-              log("ERROR", "before_prompt_build", "fetchPendingMessages failed", String(e))
-            }
-            const formatted = formatSessionMemories(memories, pendingMessages, cfg.maxSessionInjectionChars)
-            if (formatted) {
-              sessionMemoryCache.set(sessionId!, `<evermemos-context>\n${formatted}\n</evermemos-context>`)
-            }
-            log("INFO", "before_prompt_build", "Session memories loaded", {
-              sessionId,
-              groupId,
-              memories: memories.length,
-              pending: pendingMessages.length,
-            })
-          })(),
-        )
-      } else if (sessionId && !sessionLoadedSet.has(sessionId)) {
-        // Service was unavailable — will retry on next turn
-        log("INFO", "before_prompt_build", "EverMemOS unavailable, will retry memory load next turn", { sessionId })
-      }
-
       if (needsStoreSearch) {
-        tasks.push(
-          (async () => {
-            const [, searchOutcome] = await Promise.allSettled([
-              apiStoreMessage(cfg.baseUrl, cfg.userId, groupId, pendingContent!, "user", "User").catch((e) =>
-                log("ERROR", "before_prompt_build", "storeMessage(user) failed", String(e)),
-              ),
-              apiSearchMemories(cfg.baseUrl, cfg.userId, groupId, pendingContent!, cfg.searchTopK).catch(
-                (e) => {
-                  log("ERROR", "before_prompt_build", "searchMemories failed", String(e))
-                  return null
-                },
-              ),
-            ])
-            if (searchOutcome.status === "fulfilled" && searchOutcome.value) {
-              const memoriesGroups: any[] = (searchOutcome.value as any)?.result?.memories ?? []
-              const formatted = formatSearchResults(memoriesGroups, pendingContent!)
-              if (formatted && channelId) queryResultCache.set(channelId, formatted)
-              log("DEBUG", "before_prompt_build", "Query cache updated", {
-                channelId,
-                groupId,
-                groups: memoriesGroups.length,
-              })
-            }
-          })(),
-        )
+        const [, searchOutcome] = await Promise.allSettled([
+          apiStoreMessage(cfg.baseUrl, cfg.userId, groupId, pendingContent!, "user", "User").catch((e) =>
+            log("ERROR", "before_prompt_build", "storeMessage(user) failed", String(e)),
+          ),
+          apiSearchMemories(cfg.baseUrl, cfg.userId, groupId, pendingContent!, cfg.searchTopK).catch(
+            (e) => {
+              log("ERROR", "before_prompt_build", "searchMemories failed", String(e))
+              return null
+            },
+          ),
+        ])
+        if (searchOutcome.status === "fulfilled" && searchOutcome.value) {
+          const memoriesGroups: any[] = (searchOutcome.value as any)?.result?.memories ?? []
+          const formatted = formatSearchResults(memoriesGroups, pendingContent!)
+          if (formatted && channelId) queryResultCache.set(channelId, formatted)
+          log("DEBUG", "before_prompt_build", "Query cache updated", {
+            channelId,
+            groupId,
+            groups: memoriesGroups.length,
+          })
+        }
       }
-
-      if (tasks.length > 0) await Promise.all(tasks)
-
-      // Assemble context to inject
-      const parts: string[] = []
-
-      const sessionMem = sessionId ? sessionMemoryCache.get(sessionId) : undefined
-      if (sessionMem) parts.push(sessionMem)
 
       const queryMem = channelId ? queryResultCache.get(channelId) : undefined
-      if (queryMem) parts.push(`<evermemos-search-results>\n${queryMem}\n</evermemos-search-results>`)
 
       log("DEBUG", "before_prompt_build", "Injection summary", {
         sessionId,
         channelId,
         groupId,
-        session_injected: !!sessionMem,
         query_injected: !!queryMem,
-        injected_text: parts.join("\n\n"),
+        injected_text: queryMem ?? "",
       })
 
-      if (parts.length === 0) return
+      if (!queryMem) return
 
-      return { prependContext: parts.join("\n\n") }
+      return { prependContext: `<evermemos-search-results>\n${queryMem}\n</evermemos-search-results>` }
     })
 
     // ── message_received: buffer user message for before_prompt_build ────────
-    // We intentionally do NOT call EverMemOS here because workspaceDir is not
-    // available in PluginHookMessageContext.  Storing here would use a channel-level
-    // group_id fallback instead of the accurate project-level group_id, breaking
-    // per-project namespace isolation (especially on the very first message).
-    // The actual store + search happens in before_prompt_build where workspaceDir
+    // We intentionally do NOT call EverMemOS here because sessionKey is not
+    // available in PluginHookMessageContext.  Storing here would use a less accurate
+    // group_id fallback instead of the sessionKey-based group_id, breaking
+    // per-session namespace isolation (especially on the very first message).
+    // The actual store + search happens in before_prompt_build where sessionKey
     // is available via PluginHookAgentContext.
     api.on("message_received", (event, ctx) => {
       const content = event.content?.trim() || "[media message]"
@@ -485,12 +365,10 @@ export default {
     // ── session_end: clean up all caches for this session ─────────────────────
     api.on("session_end", async (event, ctx) => {
       const sessionId = ctx.sessionId
-      sessionMemoryCache.delete(sessionId)
-      sessionLoadedSet.delete(sessionId)
       const groupId = groupIdBySession.get(sessionId)
       groupIdBySession.delete(sessionId)
-      // Best-effort cleanup of channel-keyed caches using the groupId we stored
-      // (we don't have channelId in session_end context, so clean up by scanning)
+      // Clean up only the channel caches belonging to this session's groupId.
+      // channelId is not available in session_end, so we scan groupIdByChannel.
       for (const [channelId, gid] of groupIdByChannel) {
         if (gid === groupId) {
           groupIdByChannel.delete(channelId)
