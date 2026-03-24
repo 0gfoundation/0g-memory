@@ -393,6 +393,7 @@ export default {
         groupId,
         session_injected: !!sessionMem,
         query_injected: !!queryMem,
+        injected_text: parts.join("\n\n"),
       })
 
       if (parts.length === 0) return
