@@ -105,6 +105,10 @@ Your assistant will acknowledge. You do not need to do anything else — everyth
 
 Close and reopen your AI coding assistant. This starts a fresh session with no conversation history.
 
+> **Important:** reopen your assistant in the **same project directory** as Step A. Memories are namespaced per project directory — a different directory will have no memories.
+>
+> Claude Code / OpenCode: type `/exit` to quit, then reopen in the same directory.
+
 #### Step C — New session: ask your assistant to recall
 
 Send these questions one at a time:
@@ -194,7 +198,7 @@ You close your assistant and open it the next day. In the new session:
 
 > *"What database are we using and why?"*
 >
-> Claude: *"PostgreSQL — you chose it over MySQL specifically for JSONB support in your metadata schema. You also noted the API design is RESTful; GraphQL was ruled out after the team review."*
+> Assistant: *"PostgreSQL — you chose it over MySQL specifically for JSONB support in your metadata schema. You also noted the API design is RESTful; GraphQL was ruled out after the team review."*
 
 The assistant did not guess. It retrieved the exact reasoning you recorded.
 
@@ -267,6 +271,7 @@ All log commands below must be run from the `0g-memory` project directory.
 | EverMemOS backend | `tail -f $(ls -t logs/evermemos_*.log \| head -1)` |
 | kv-server | `tail -f $(ls -t 0g_kv_server/kv_*.log \| head -1)` |
 | Claude Code hook activity | `tail -f ~/.claude/logs/hook_user_prompt.log` |
+| OpenCode plugin activity | `tail -f /tmp/evermemos_opencode.log` |
 
 To confirm the 2-minute test worked, run these after completing both the seed session and the recall session. You should see storage entries from the seed session and search entries from the recall session:
 
@@ -297,7 +302,6 @@ grep "sender_name=Claude (Response)" "$LOG" | wc -l
 grep "sender_name=Claude (Tool)"     "$LOG" | wc -l
 
 # Activity by sender type — OpenCode
-grep "sender_name=User"                "$LOG" | wc -l
 grep "sender_name=OpenCode (Response)" "$LOG" | wc -l
 grep "sender_name=OpenCode (Tool)"     "$LOG" | wc -l
 ```
