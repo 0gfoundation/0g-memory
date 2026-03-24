@@ -228,7 +228,9 @@ function formatToolObservation(toolName: string, params: unknown, result: unknow
     lines.push(paramsStr.length > 2000 ? paramsStr.slice(0, 2000) + "..." : paramsStr)
     lines.push("")
   }
-  const resultStr = result !== undefined && result !== null ? String(result) : ""
+  const resultStr = result !== undefined && result !== null
+    ? (typeof result === "string" ? result : JSON.stringify(result, null, 2))
+    : ""
   if (resultStr) {
     lines.push("📤 Output:")
     lines.push(resultStr.length > 2000 ? resultStr.slice(0, 2000) + "..." : resultStr)
