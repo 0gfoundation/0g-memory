@@ -40,26 +40,29 @@ function resolveConfig(pluginConfig: Record<string, unknown> | undefined): Plugi
 
 /**
  * Derive a unique group_id for EverMemOS namespace isolation.
- * Mirrors evermemos_config.py::get_project_group_id() in the Claude Code integration.
  *
  * Priority:
  *   1. EVERMEMOS_GROUP_ID env var (explicit override)
- *   2. project_<workspaceDir>_<userId>  (when workspaceDir is available)
- *   3. channel_<channelId>_<userId>     (channel-level fallback)
- *   4. session_<sessionKey>_<userId>    (session-level fallback)
- *   5. project_openclaw_<userId>        (last resort)
+ *   2. session_<sessionKey>_<userId>   (e.g. "main", "tui-xxx") — preferred
+ *   3. project_<workspaceDir>_<userId> (fallback when sessionKey unavailable)
+ *   4. channel_<channelId>_<userId>    (fallback when workspaceDir also unavailable)
+ *   5. project_openclaw_<userId>       (last resort)
+ *
+ * sessionKey is the preferred identifier because OpenClaw sessions all share the
+ * same default workspaceDir, making it a poor isolation key.  workspaceDir and
+ * channelId are kept as fallbacks for channels that do not expose sessionKey.
  */
 function deriveGroupId(opts: {
+  sessionKey?: string
   workspaceDir?: string
   channelId?: string
-  sessionKey?: string
   userId: string
 }): string {
   const explicit = process.env.EVERMEMOS_GROUP_ID
   if (explicit) return explicit
+  if (opts.sessionKey) return `session_${opts.sessionKey}_${opts.userId}`
   if (opts.workspaceDir) return `project_${opts.workspaceDir}_${opts.userId}`
   if (opts.channelId) return `channel_${opts.channelId}_${opts.userId}`
-  if (opts.sessionKey) return `session_${opts.sessionKey}_${opts.userId}`
   return `project_openclaw_${opts.userId}`
 }
 
@@ -272,13 +275,12 @@ export default {
       const sessionId = ctx.sessionId
       const channelId = ctx.channelId
 
-      // Derive and cache the authoritative group_id (workspaceDir available here).
-      // This is the only place where group_id is accurately derived; all other hooks
-      // read from these caches.
+      // Derive and cache the authoritative group_id.
+      // This is the only place where group_id is derived; all other hooks read from these caches.
       const groupId = deriveGroupId({
+        sessionKey: ctx.sessionKey ?? undefined,
         workspaceDir: ctx.workspaceDir,
         channelId: channelId ?? undefined,
-        sessionKey: ctx.sessionKey ?? undefined,
         userId: cfg.userId,
       })
       if (sessionId) groupIdBySession.set(sessionId, groupId)
