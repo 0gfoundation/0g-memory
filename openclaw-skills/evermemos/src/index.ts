@@ -225,7 +225,7 @@ function formatToolObservation(toolName: string, params: unknown, result: unknow
   if (params !== undefined && params !== null) {
     lines.push("📥 Input:")
     const paramsStr = JSON.stringify(params, null, 2)
-    lines.push(paramsStr.length > 2000 ? paramsStr.slice(0, 2000) + "..." : paramsStr)
+    lines.push(paramsStr.length > 20000 ? paramsStr.slice(0, 20000) + "..." : paramsStr)
     lines.push("")
   }
   const resultStr = result !== undefined && result !== null
@@ -233,7 +233,7 @@ function formatToolObservation(toolName: string, params: unknown, result: unknow
     : ""
   if (resultStr) {
     lines.push("📤 Output:")
-    lines.push(resultStr.length > 2000 ? resultStr.slice(0, 2000) + "..." : resultStr)
+    lines.push(resultStr.length > 20000 ? resultStr.slice(0, 20000) + "..." : resultStr)
   }
   return lines.join("\n")
 }
