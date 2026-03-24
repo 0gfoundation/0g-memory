@@ -4,7 +4,7 @@ This project gives your AI agent memory that lasts forever. Every conversation �
 
 Unlike memory systems that rely on local storage, your memories here are stored on the [0G decentralized storage network](https://docs.0g.ai/concepts/storage), encrypted with a key only you hold, and persisted on-chain. Your memory survives hardware failures and is never held by any central server.
 
-The currently supported AI coding assistant is **Claude Code**, with more integrations on the roadmap.
+Supported clients: **Claude Code** and **OpenCode**. `install.sh` detects which are installed and sets up the integration automatically.
 
 ---
 
@@ -12,8 +12,8 @@ The currently supported AI coding assistant is **Claude Code**, with more integr
 
 Three layers work together to deliver forever-persistent memory:
 
-**1. Automatic capture via Claude Code hooks**
-`install.sh` registers hooks into Claude Code's global settings. From that point on, every prompt you send, every Claude response, and every tool call result is silently captured — no commands needed. At the start of each new session, recent memories are injected into Claude's context automatically. Mid-session, when you reference past events, Claude searches the memory store and incorporates the results before replying.
+**1. Automatic capture via client integration**
+`install.sh` registers hooks or plugins into your AI coding assistant. From that point on, every prompt you send, every response, and every tool call result is silently captured — no commands needed. At the start of each new session, recent memories are injected into the assistant's context automatically. Mid-session, when you reference past events, the assistant searches the memory store and incorporates the results before replying.
 
 **2. Structured memory extraction via EverMemOS**
 Raw conversation data is processed by [EverMemOS](https://github.com/EverMind-AI/EverMemOS/), an open-source memory system that extracts structured episodic memories, indexes them across MongoDB, Elasticsearch, Milvus, and Redis, and supports keyword, vector, hybrid, and agentic retrieval. Each project directory gets its own isolated memory namespace, so different codebases don't mix.
@@ -30,7 +30,7 @@ This is what makes memory truly permanent. The memory system writes every memory
 | Requirement | Ubuntu | macOS |
 |---|---|---|
 | OS | Ubuntu 20.04+ | macOS 12+ |
-| [Claude Code](https://claude.ai/code) | must be installed | must be installed |
+| [Claude Code](https://claude.ai/code) and/or [OpenCode](https://opencode.ai) | at least one must be installed | at least one must be installed |
 | Python 3.8+ ¹ | typically pre-installed | typically pre-installed |
 | [Homebrew](https://brew.sh) | — | [Appendix A](#appendix-a-installing-homebrew-on-macos) |
 | Docker 20.10+ | auto-installed if missing | [Appendix B](#appendix-b-installing-docker-on-macos) |
@@ -81,15 +81,15 @@ When startup completes successfully, you will see:
 ============================================================
 ```
 
-> If Claude Code is already running, **restart it** now so the hooks registered by `install.sh` take effect.
+> If Claude Code or OpenCode is already running, **restart it** now so the hooks/plugins registered by `install.sh` take effect.
 
 ### 4. Verify Memory Works — A 2-Minute Test
 
-The memory backend runs silently in the background. The fastest way to confirm it is working is to plant a few facts, restart, and ask Claude to recall them.
+The memory backend runs silently in the background. The fastest way to confirm it is working is to plant a few facts, restart, and ask your assistant to recall them.
 
-#### Step A — Seed session: tell Claude specific facts
+#### Step A — Seed session: tell your assistant specific facts
 
-Open Claude Code and send this message (copy it exactly):
+Open your AI coding assistant and send this message (copy it exactly):
 
 ```
 I want to record a few project decisions for later:
@@ -99,13 +99,17 @@ I want to record a few project decisions for later:
 Please confirm you've noted these.
 ```
 
-Claude will acknowledge. You do not need to do anything else — everything is stored automatically.
+Your assistant will acknowledge. You do not need to do anything else — everything is stored automatically.
 
-#### Step B — Close and reopen Claude Code
+#### Step B — Close and reopen your assistant
 
-Type `/exit` to quit Claude Code, then reopen it. This starts a fresh session with no conversation history.
+Close and reopen your AI coding assistant. This starts a fresh session with no conversation history.
 
-#### Step C — New session: ask Claude to recall
+> **Important:** reopen your assistant in the **same project directory** as Step A. Memories are namespaced per project directory — a different directory will have no memories.
+>
+> Claude Code / OpenCode: type `/exit` to quit, then reopen in the same directory.
+
+#### Step C — New session: ask your assistant to recall
 
 Send these questions one at a time:
 
@@ -123,13 +127,13 @@ What API style did we settle on?
 
 **Expected results:**
 
-| Question | Claude should answer |
+| Question | Expected answer |
 |---|---|
 | Database choice | PostgreSQL — needed JSONB support for metadata schema |
 | Auth bug | JWT expiry was set in seconds instead of milliseconds |
 | API style | RESTful — GraphQL was ruled out after the team review |
 
-If Claude answers correctly with the specific details (JSONB, milliseconds, GraphQL ruled out), memory is working. If Claude says it has no memory of prior conversations, check [Verify everything is running](#verify-everything-is-running) in the Advanced Usage section.
+If your assistant answers correctly with the specific details (JSONB, milliseconds, GraphQL ruled out), memory is working. If your assistant says it has no memory of prior conversations, check [Verify everything is running](#verify-everything-is-running) in the Advanced Usage section.
 
 ### 5. Stop & Resume
 
@@ -161,7 +165,7 @@ When you come back and want to resume:
 install.sh
   └─ fill in .env
        └─ start_service.sh                        ← first time (fresh stream)
-            └─ use Claude Code normally
+            └─ use your AI coding assistant normally
                  └─ stop_service.sh               ← data preserved
                       └─ start_service.sh --restart   ← resume (re-sync chain)
                            └─ ...
@@ -174,55 +178,55 @@ install.sh
 
 ### How the memory system works
 
-The memory backend intercepts every message you send and every reply Claude gives, stores them as structured memories, and makes those memories available in future sessions — automatically, without any extra commands.
+The memory backend intercepts every message you send and every reply your assistant gives, stores them as structured memories, and makes those memories available in future sessions — automatically, without any extra commands.
 
 There are two mechanisms at play:
 
-**Passive storage** — every prompt you submit, every Claude response, and every tool call result is captured by a Claude Code hook and sent to the memory backend. Nothing is lost, and nothing requires action on your part.
+**Passive storage** — every prompt you submit, every assistant response, and every tool call result is captured and sent to the memory backend. Nothing is lost, and nothing requires action on your part.
 
-**Active retrieval** — at the start of each new session, recent memories are fetched and injected directly into Claude's context. Mid-session, whenever you reference past events or ask about something discussed before, Claude searches the memory store and incorporates the results before replying.
+**Active retrieval** — at the start of each new session, recent memories are fetched and injected directly into the assistant's context. Mid-session, whenever you reference past events or ask about something discussed before, the assistant searches the memory store and incorporates the results before replying.
 
-The practical effect: Claude carries context across sessions the same way a colleague does — it remembers past decisions, ongoing work, and the reasoning behind choices, even after you close and reopen Claude Code.
+The practical effect: your assistant carries context across sessions the same way a colleague does — it remembers past decisions, ongoing work, and the reasoning behind choices, even after you close and reopen it.
 
 **Example — decisions that survive across sessions:**
 
-You tell Claude in one session:
+You tell your assistant in one session:
 
 > *"We chose PostgreSQL over MySQL because we need JSONB support for our metadata schema. Also, the API will be RESTful — we ruled out GraphQL after the team review."*
 
-You close Claude Code and open it the next day. In the new session:
+You close your assistant and open it the next day. In the new session:
 
 > *"What database are we using and why?"*
 >
-> Claude: *"PostgreSQL — you chose it over MySQL specifically for JSONB support in your metadata schema. You also noted the API design is RESTful; GraphQL was ruled out after the team review."*
+> Assistant: *"PostgreSQL — you chose it over MySQL specifically for JSONB support in your metadata schema. You also noted the API design is RESTful; GraphQL was ruled out after the team review."*
 
-Claude did not guess. It retrieved the exact reasoning you recorded.
+The assistant did not guess. It retrieved the exact reasoning you recorded.
 
 **Example — picking up mid-project without re-explaining:**
 
 > *"Continue where we left off with the auth module."*
 >
-> Claude automatically searches your memory for prior auth discussions — past decisions, bugs fixed, approaches considered — and resumes from that point without you having to re-explain the context.
+> Your assistant automatically searches your memory for prior auth discussions — past decisions, bugs fixed, approaches considered — and resumes from that point without you having to re-explain the context.
 
-This is the core value: the longer you use Claude Code, the richer the memory store becomes, and the less time you spend re-establishing context at the start of each session.
+This is the core value: the longer you use your AI coding assistant, the richer the memory store becomes, and the less time you spend re-establishing context at the start of each session.
 
-### How memory works during a Claude Code session
+### How memory works during a session
 
 | Moment | What happens |
 |--------|-------------|
-| Session start | Recent memories are fetched and injected into Claude's context |
+| Session start | Recent memories are fetched and injected into the assistant's context |
 | Every prompt you send | Your message is stored |
-| Every Claude reply | Claude's response is stored |
+| Every assistant reply | The response is stored |
 | Every tool call | Tool name and result are stored |
-| Question references past context (e.g. "last time", "previously", "continue where we left off") | Claude automatically searches memory and incorporates the results |
+| Question references past context (e.g. "last time", "previously", "continue where we left off") | The assistant automatically searches memory and incorporates the results |
 
 ### What `install.sh` does
 
 `install.sh` sets up everything automatically:
 
 - **Installs Python dependencies** into `.venv/` — the Python packages EverMemOS needs to run.
-- **Installs Claude Code skills** — copies a small script into `~/.claude/skills/`. Claude Code looks in this folder for "skills": tools it can call during a conversation. The EverMemOS skill lets Claude search your memory store on demand.
-- **Registers hooks** — adds entries to `~/.claude/settings.json`. Hooks are shell commands that Claude Code automatically runs at specific moments (e.g. when you submit a prompt, when a session starts). EverMemOS uses hooks to store every message you send and every reply Claude gives, so nothing is lost.
+- **Installs Claude Code skills and hooks** (if Claude Code is installed) — copies skills into `~/.claude/skills/` and registers hooks in `~/.claude/settings.json`. Hooks capture every prompt, response, and tool call automatically.
+- **Installs OpenCode plugin** (if OpenCode is installed) — copies the plugin into `~/.config/opencode/plugins/` and registers it in `~/.config/opencode/opencode.json`.
 - **Generates `.0g_secrets`** — creates a stream ID and encryption key for the 0G KV storage layer. Think of the stream ID as a unique address for your personal memory store on the 0G decentralized network, and the encryption key as the password that protects it. These are generated once and reused across restarts.
 - **Downloads `zgs_kv`** — installs the 0G KV server binary into `0g_kv_server/`. This is a lightweight node that connects your machine to the 0G storage network, allowing EverMemOS to persist memories on-chain.
 
@@ -232,7 +236,7 @@ Three things start in order:
 
 1. **kv-server** (`zgs_kv`) — the 0G KV storage node. It syncs your stream from the blockchain so your memories are available locally.
 2. **Docker containers** — MongoDB, Elasticsearch, Milvus, and Redis. These are the databases that power memory indexing and search.
-3. **EverMemOS backend** — a REST API on `http://localhost:1995` that Claude Code talks to for storing and retrieving memories.
+3. **EverMemOS backend** — a REST API on `http://localhost:1995` that your AI coding assistant talks to for storing and retrieving memories.
 
 ### Why `--restart` is required on resume
 
@@ -266,7 +270,8 @@ All log commands below must be run from the `0g-memory` project directory.
 |-----------|---------|
 | EverMemOS backend | `tail -f $(ls -t logs/evermemos_*.log \| head -1)` |
 | kv-server | `tail -f $(ls -t 0g_kv_server/kv_*.log \| head -1)` |
-| Hook activity | `tail -f ~/.claude/logs/hook_user_prompt.log` |
+| Claude Code hook activity | `tail -f ~/.claude/logs/hook_user_prompt.log` |
+| OpenCode plugin activity | `tail -f /tmp/evermemos_opencode.log` |
 
 To confirm the 2-minute test worked, run these after completing both the seed session and the recall session. You should see storage entries from the seed session and search entries from the recall session:
 
@@ -288,13 +293,17 @@ LOG=$(ls -t logs/evermemos_*.log | head -1)
 # Messages received and memories extracted
 grep "Received memorize request\|Memory request processing completed" "$LOG" | tail -20
 
-# Search calls (what Claude searched for)
+# Search calls triggered by the assistant
 grep "Received search request" "$LOG" | tail -10
 
-# Activity by sender type
+# Activity by sender type — Claude Code
 grep "sender_name=User"              "$LOG" | wc -l
 grep "sender_name=Claude (Response)" "$LOG" | wc -l
 grep "sender_name=Claude (Tool)"     "$LOG" | wc -l
+
+# Activity by sender type — OpenCode
+grep "sender_name=OpenCode (Response)" "$LOG" | wc -l
+grep "sender_name=OpenCode (Tool)"     "$LOG" | wc -l
 ```
 
 ### Uninstall — what gets removed
@@ -306,8 +315,8 @@ grep "sender_name=Claude (Tool)"     "$LOG" | wc -l
 Permanently removes:
 - Docker containers and all volumes (MongoDB, Elasticsearch, Milvus, Redis data)
 - `.0g_secrets`, `.env`, `.venv/`
-- EverMemOS skills from `~/.claude/skills/`
-- EverMemOS hooks from `~/.claude/settings.json`
+- EverMemOS skills from `~/.claude/skills/` and hooks from `~/.claude/settings.json`
+- EverMemOS plugin from `~/.config/opencode/plugins/` and entry from `~/.config/opencode/opencode.json`
 
 > After uninstalling, running `install.sh` again generates a new stream ID and encryption key — **previous memories are not recoverable**.
 
