@@ -85,7 +85,7 @@ When startup completes successfully, you will see:
 
 ### 4. Verify Memory Works — A 2-Minute Test
 
-The memory backend runs silently in the background. The fastest way to confirm it is working is to plant a few facts, restart, and ask Claude to recall them.
+The memory backend runs silently in the background. The fastest way to confirm it is working is to plant a few facts, restart, and ask your assistant to recall them.
 
 #### Step A — Seed session: tell your assistant specific facts
 
@@ -99,13 +99,13 @@ I want to record a few project decisions for later:
 Please confirm you've noted these.
 ```
 
-Claude will acknowledge. You do not need to do anything else — everything is stored automatically.
+Your assistant will acknowledge. You do not need to do anything else — everything is stored automatically.
 
 #### Step B — Close and reopen your assistant
 
 Close and reopen your AI coding assistant. This starts a fresh session with no conversation history.
 
-#### Step C — New session: ask Claude to recall
+#### Step C — New session: ask your assistant to recall
 
 Send these questions one at a time:
 
@@ -123,13 +123,13 @@ What API style did we settle on?
 
 **Expected results:**
 
-| Question | Claude should answer |
+| Question | Expected answer |
 |---|---|
 | Database choice | PostgreSQL — needed JSONB support for metadata schema |
 | Auth bug | JWT expiry was set in seconds instead of milliseconds |
 | API style | RESTful — GraphQL was ruled out after the team review |
 
-If Claude answers correctly with the specific details (JSONB, milliseconds, GraphQL ruled out), memory is working. If Claude says it has no memory of prior conversations, check [Verify everything is running](#verify-everything-is-running) in the Advanced Usage section.
+If your assistant answers correctly with the specific details (JSONB, milliseconds, GraphQL ruled out), memory is working. If your assistant says it has no memory of prior conversations, check [Verify everything is running](#verify-everything-is-running) in the Advanced Usage section.
 
 ### 5. Stop & Resume
 
@@ -174,7 +174,7 @@ install.sh
 
 ### How the memory system works
 
-The memory backend intercepts every message you send and every reply Claude gives, stores them as structured memories, and makes those memories available in future sessions — automatically, without any extra commands.
+The memory backend intercepts every message you send and every reply your assistant gives, stores them as structured memories, and makes those memories available in future sessions — automatically, without any extra commands.
 
 There are two mechanisms at play:
 
@@ -186,7 +186,7 @@ The practical effect: your assistant carries context across sessions the same wa
 
 **Example — decisions that survive across sessions:**
 
-You tell Claude in one session:
+You tell your assistant in one session:
 
 > *"We chose PostgreSQL over MySQL because we need JSONB support for our metadata schema. Also, the API will be RESTful — we ruled out GraphQL after the team review."*
 
@@ -196,13 +196,13 @@ You close your assistant and open it the next day. In the new session:
 >
 > Claude: *"PostgreSQL — you chose it over MySQL specifically for JSONB support in your metadata schema. You also noted the API design is RESTful; GraphQL was ruled out after the team review."*
 
-Claude did not guess. It retrieved the exact reasoning you recorded.
+The assistant did not guess. It retrieved the exact reasoning you recorded.
 
 **Example — picking up mid-project without re-explaining:**
 
 > *"Continue where we left off with the auth module."*
 >
-> Claude automatically searches your memory for prior auth discussions — past decisions, bugs fixed, approaches considered — and resumes from that point without you having to re-explain the context.
+> Your assistant automatically searches your memory for prior auth discussions — past decisions, bugs fixed, approaches considered — and resumes from that point without you having to re-explain the context.
 
 This is the core value: the longer you use your AI coding assistant, the richer the memory store becomes, and the less time you spend re-establishing context at the start of each session.
 
