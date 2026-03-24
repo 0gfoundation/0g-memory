@@ -132,13 +132,22 @@ for line in sys.stdin:
     msg  = d.get('msg', '')
     ts   = d['ts'][11:19]
     data = d.get('data', {})
+    sep = '─' * 70
     if msg == 'User message buffered for before_prompt_build':
         content = data.get('content', '')
-        print(f\"[{ts}] 📥 USER  | ch={data.get('channelId','')} | {content[:120]}\")
+        print(f\"\n[{ts}] 📥 USER  | ch={data.get('channelId','')}\")
+        print(content)
+        print(sep)
     elif msg == 'Storing assistant response':
-        print(f\"[{ts}] 🤖 AI    | len={data.get('length')} | group={data.get('groupId','')}\")
+        content = data.get('content', '')
+        print(f\"\n[{ts}] 🤖 AI    | len={data.get('length')} | group={data.get('groupId','')}\")
+        print(content)
+        print(sep)
     elif msg == 'Storing tool call':
-        print(f\"[{ts}] 🔧 TOOL  | tool={data.get('tool')} | group={data.get('groupId','')}\")
+        content = data.get('content', '')
+        print(f\"\n[{ts}] 🔧 TOOL  | tool={data.get('tool')} | group={data.get('groupId','')}\")
+        print(content)
+        print(sep)
 "
 }
 

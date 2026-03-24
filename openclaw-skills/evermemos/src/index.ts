@@ -448,6 +448,7 @@ export default {
         sessionId,
         groupId,
         length: fullText.length,
+        content: fullText,
       })
     })
 
@@ -475,6 +476,7 @@ export default {
         sessionId,
         groupId,
         tool: event.toolName,
+        content: observation,
       })
     })
 
