@@ -10,6 +10,8 @@
 #   7 (kv-server): Deletes config_testnet_turbo.toml, zgs_kv binary, db/, kv.DB, kv_*.log
 #   6 (reverse): Deletes .0g_secrets
 #   6b. Removes EverMemOS hooks and env vars from ~/.claude/settings.json
+#   6c. Removes EverMemOS plugin from OpenCode (~/.config/opencode/)
+#   6d. Removes EverMemOS plugin from OpenClaw (~/.openclaw/openclaw.json)
 #   6a. Removes EverMemOS skills from ~/.claude/skills/
 #   5b. Deletes runtime files in logs/ (evermemos_*.log, evermemos.pid)
 #   5a. Deletes .env
@@ -209,6 +211,71 @@ for entry in evermemos_entries:
 print("  ✅ Updated ~/.config/opencode/opencode.json")
 EOF
 
+# ── OpenClaw plugin removal ───────────────────────────────────────────────────
+echo ""
+echo "▶  Removing EverMemOS plugin from OpenClaw..."
+
+# Try CLI uninstall first (non-fatal — may not be supported or plugin already gone)
+if command -v openclaw &>/dev/null; then
+    openclaw plugins uninstall evermemos-openclaw 2>/dev/null \
+        && echo "  ✅ openclaw plugins uninstall evermemos-openclaw succeeded" \
+        || echo "  ℹ️  openclaw plugins uninstall returned non-zero (may already be gone), continuing"
+fi
+
+# Patch ~/.openclaw/openclaw.json to remove entries + load path
+python3 - <<'EOF'
+import json
+from pathlib import Path
+
+config_path = Path.home() / ".openclaw" / "openclaw.json"
+if not config_path.exists():
+    print("  ℹ️  ~/.openclaw/openclaw.json not found, skipping")
+    exit(0)
+
+try:
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+except (json.JSONDecodeError, OSError) as e:
+    print(f"  ⚠️  Could not read ~/.openclaw/openclaw.json: {e}, skipping")
+    exit(0)
+
+changed = False
+plugins = config.get("plugins", {})
+
+# Remove entries.evermemos-openclaw
+entries = plugins.get("entries", {})
+if "evermemos-openclaw" in entries:
+    del entries["evermemos-openclaw"]
+    print("  ✅ Removed plugins.entries.evermemos-openclaw")
+    changed = True
+else:
+    print("  ℹ️  plugins.entries.evermemos-openclaw not found, skipping")
+
+# Remove evermemos path from plugins.load.paths
+load = plugins.get("load", {})
+paths = load.get("paths", [])
+new_paths = [p for p in paths if "evermemos" not in p and "0g-memory/openclaw-skills" not in p]
+if len(new_paths) < len(paths):
+    load["paths"] = new_paths
+    print(f"  ✅ Removed evermemos path from plugins.load.paths")
+    changed = True
+else:
+    print("  ℹ️  No evermemos path found in plugins.load.paths, skipping")
+
+if not changed:
+    exit(0)
+
+try:
+    tmp = config_path.with_suffix(".json.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    tmp.replace(config_path)
+    print("  ✅ Updated ~/.openclaw/openclaw.json")
+except OSError as e:
+    print(f"  ⚠️  Failed to write ~/.openclaw/openclaw.json: {e}")
+EOF
+
 # ── Step 6a (reverse): Remove EverMemOS skills from ~/.claude/skills/ ─────────
 echo ""
 echo "▶  Removing EverMemOS skills from ~/.claude/skills/..."
@@ -280,5 +347,8 @@ echo "     removed hooks take effect."
 echo ""
 echo "  ⚠️  If OpenCode is running, restart it so the"
 echo "     removed plugin takes effect."
+echo ""
+echo "  ⚠️  If OpenClaw is running, restart the gateway so the"
+echo "     removed plugin takes effect: openclaw gateway restart"
 echo "============================================================"
 echo ""

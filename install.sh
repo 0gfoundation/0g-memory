@@ -10,7 +10,7 @@
 #   2. Checks / auto-installs uv package manager
 #   3. Installs Python dependencies (uv sync)
 #   4. Verifies Docker is installed, creates .env from template
-#   5. Copies EverMemOS skills to ~/.claude/skills/ and merges hooks into ~/.claude/settings.json
+#   5. Installs Claude Code / OpenCode / OpenClaw integrations (if installed)
 #   6. Fetches current block height and sets log_sync_start_block_number in kv-server config
 #   7. Generates .0g_secrets (stream_id + encryption_key)
 #   8. Writes stream_id + encryption_key into kv-server config
@@ -61,7 +61,7 @@ echo "✅ Python $PYTHON_VERSION (uv will manage Python 3.12 for the application
 #   2. Checks / auto-installs uv package manager
 #   3. Installs Python dependencies (uv sync)
 #   4. Verifies Docker is installed, creates .env from template
-#   5. Copies EverMemOS skills to ~/.claude/skills/ and merges hooks into ~/.claude/settings.json
+#   5. Installs Claude Code / OpenCode / OpenClaw integrations (if installed)
 echo ""
 echo "▶  Running setup..."
 echo ""
@@ -207,7 +207,8 @@ echo ""
 echo "  Next step: start services"
 echo "    bash ./start_service.sh"
 echo ""
-echo "  ℹ️  If Claude Code or OpenCode integrations were installed above,"
+echo "  ℹ️  If Claude Code, OpenCode, or OpenClaw integrations were installed above,"
 echo "     restart those tools so the newly added hooks/plugins take effect."
+echo "     For OpenClaw: openclaw gateway restart"
 echo "============================================================"
 echo ""

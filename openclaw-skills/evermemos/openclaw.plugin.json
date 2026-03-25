@@ -1,0 +1,25 @@
+{
+  "id": "evermemos-openclaw",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "apiBaseUrl": {
+        "type": "string",
+        "description": "EverMemOS API base URL (default: http://localhost:1995)"
+      },
+      "userId": {
+        "type": "string",
+        "description": "User identifier for EverMemOS storage (default: openclaw_user)"
+      },
+      "searchTopK": {
+        "type": "number",
+        "description": "Number of search results to retrieve per query (default: 5)"
+      },
+      "maxSessionInjectionChars": {
+        "type": "number",
+        "description": "Maximum characters of session memories to inject per turn (default: 6000)"
+      }
+    }
+  }
+}

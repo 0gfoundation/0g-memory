@@ -1,0 +1,11 @@
+{
+  "name": "evermemos-openclaw",
+  "version": "1.0.0",
+  "description": "EverMemOS persistent memory integration plugin for OpenClaw",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}

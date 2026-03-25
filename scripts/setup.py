@@ -801,6 +801,151 @@ class SetupManager:
             self.print_error(f"Failed to write opencode.json: {e}")
             return False
 
+    def is_openclaw_installed(self) -> bool:
+        """Check if OpenClaw is installed: binary in PATH or ~/.openclaw/ exists."""
+        if shutil.which("openclaw"):
+            return True
+        if (Path.home() / ".openclaw").exists():
+            return True
+        return False
+
+    def install_openclaw_plugin(self) -> bool:
+        """
+        Install the EverMemOS plugin for OpenClaw using
+        ``openclaw plugins install --link <path>``.
+
+        This delegates to the OpenClaw CLI, which uses its own JSON5 parser to
+        update ``~/.openclaw/openclaw.json5`` safely.  A ``plugins enable``
+        call then activates the plugin.
+
+        Safe to run multiple times — OpenClaw handles re-installs gracefully.
+        """
+        self.print_header("Installing OpenClaw Integration")
+
+        plugin_src = self.project_dir / "openclaw-skills" / "evermemos"
+        if not plugin_src.exists():
+            self.print_warning(f"openclaw-skills/evermemos/ not found at {plugin_src}, skipping")
+            return False
+
+        openclaw_bin = shutil.which("openclaw")
+        if not openclaw_bin:
+            self.print_warning(
+                "'openclaw' binary not found in PATH — "
+                "cannot run 'openclaw plugins install'. "
+                "Add OpenClaw to your PATH and re-run setup."
+            )
+            return False
+
+        # ── Step 1: Link the plugin via OpenClaw CLI ──────────────────────────
+        try:
+            result = subprocess.run(
+                [openclaw_bin, "plugins", "install", "--link", str(plugin_src)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode != 0:
+                self.print_warning(
+                    f"'openclaw plugins install --link' exited {result.returncode}: "
+                    f"{result.stderr.strip() or result.stdout.strip()}"
+                )
+                return False
+            self.print_success(f"Linked plugin: {plugin_src}")
+        except subprocess.TimeoutExpired:
+            self.print_warning("'openclaw plugins install --link' timed out")
+            return False
+        except OSError as e:
+            self.print_warning(f"Failed to run openclaw CLI: {e}")
+            return False
+
+        # ── Step 2: Enable the plugin ─────────────────────────────────────────
+        try:
+            result = subprocess.run(
+                [openclaw_bin, "plugins", "enable", "evermemos-openclaw"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if result.returncode != 0:
+                # Non-fatal: plugin may already be enabled, or CLI may not support this command
+                self.print_warning(
+                    f"'openclaw plugins enable evermemos-openclaw' exited {result.returncode} "
+                    f"(may already be enabled): {result.stderr.strip() or result.stdout.strip()}"
+                )
+            else:
+                self.print_success("Enabled plugin: evermemos-openclaw")
+        except (subprocess.TimeoutExpired, OSError) as e:
+            self.print_warning(f"'openclaw plugins enable' failed: {e} — you may need to enable manually")
+
+        # ── Step 3: Patch ~/.openclaw/openclaw.json with plugin config ───────
+        config_path = Path.home() / ".openclaw" / "openclaw.json"
+
+        config: dict = {}
+        if config_path.exists():
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+            except (json.JSONDecodeError, OSError) as e:
+                self.print_warning(f"Could not read {config_path}: {e}, will recreate")
+                config = {}
+
+        plugin_id = "evermemos-openclaw"
+        plugin_config_block = {
+            "apiBaseUrl": "http://localhost:1995",
+            "userId": "openclaw_user",
+            "searchTopK": 5,
+        }
+
+        plugins = config.setdefault("plugins", {})
+        entries = plugins.setdefault("entries", {})
+
+        if plugin_id not in entries:
+            entries[plugin_id] = {"enabled": True, "config": plugin_config_block}
+            self.print_success(f"Added plugins.entries.{plugin_id} to openclaw.json")
+        else:
+            entry = entries[plugin_id]
+            patched = False
+            if not entry.get("enabled"):
+                entry["enabled"] = True
+                self.print_success(f"Set plugins.entries.{plugin_id}.enabled = true")
+                patched = True
+            if "config" not in entry:
+                entry["config"] = plugin_config_block
+                self.print_success(f"Added missing config block to plugins.entries.{plugin_id}")
+                patched = True
+            if not patched:
+                self.print_info(f"plugins.entries.{plugin_id} already configured, skipping")
+
+        load = plugins.setdefault("load", {})
+        paths: list = load.setdefault("paths", [])
+        plugin_path = str(plugin_src)
+        if plugin_path not in paths:
+            paths.append(plugin_path)
+            self.print_success(f"Added {plugin_path} to plugins.load.paths")
+        else:
+            self.print_info("plugins.load.paths already contains plugin path, skipping")
+
+        try:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = config_path.with_suffix(".json.tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+                f.write("\n")
+            tmp.replace(config_path)
+            self.print_success("Updated ~/.openclaw/openclaw.json")
+        except OSError as e:
+            self.print_warning(f"Failed to write openclaw.json: {e}")
+            self.print_info(
+                "Please manually add to ~/.openclaw/openclaw.json:\n"
+                f'  "plugins": {{"entries": {{"{plugin_id}": {{"enabled": true, '
+                f'"config": {{"apiBaseUrl": "http://localhost:1995", '
+                f'"userId": "openclaw_user", "searchTopK": 5}}}}}}}}'
+            )
+            return False
+
+        self.print_info("Restart the OpenClaw gateway to apply: openclaw gateway restart")
+        return True
+
     def run_setup(self, non_interactive: bool = False) -> bool:
         """Run complete setup process"""
         self.print_header("EverMemOS Setup")
@@ -862,6 +1007,20 @@ class SetupManager:
                 "OpenCode not detected ('opencode' not in PATH, ~/.config/opencode/ and "
                 "~/.opencode/bin/opencode not found), skipping OpenCode integration. "
                 "Install OpenCode first, then re-run setup to enable it."
+            )
+
+        # Step 7: Install OpenClaw integration (if OpenClaw is installed)
+        if self.is_openclaw_installed():
+            if not self.install_openclaw_plugin():
+                self.print_warning(
+                    "OpenClaw plugin installation failed — "
+                    "you can re-run setup to retry."
+                )
+        else:
+            self.print_info(
+                "OpenClaw not detected ('openclaw' not in PATH and ~/.openclaw/ not found), "
+                "skipping OpenClaw integration. "
+                "Install OpenClaw first, then re-run setup to enable it."
             )
 
         return True
