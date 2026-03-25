@@ -21,8 +21,24 @@ from pathlib import Path
 
 BASE_URL = "http://localhost:1995"
 USER_ID  = "openclaw_user"
-GROUP_ID = "project_/home/op/.openclaw/workspace_openclaw_user"
 LOG      = "/tmp/evermemos_openclaw.log"
+
+# 从日志中动态提取实际使用的 group_id
+def detect_group_id():
+    for line in Path(LOG).read_text().splitlines():
+        try:
+            d = json.loads(line)
+        except:
+            continue
+        data = d.get("data", {})
+        if not isinstance(data, dict):
+            continue
+        g = data.get("groupId", "")
+        if g:
+            return g
+    return ""
+
+GROUP_ID = detect_group_id()
 
 def search_api(query, top_k=5):
     params = urllib.parse.urlencode({
@@ -71,6 +87,8 @@ for line in Path(LOG).read_text().splitlines():
         continue
     msg  = d.get("msg", "")
     data = d.get("data", {})
+    if not isinstance(data, dict):
+        continue
     ch   = data.get("channelId")
 
     if msg == "User message buffered for before_prompt_build" and ch:

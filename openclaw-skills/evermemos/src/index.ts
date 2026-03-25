@@ -107,7 +107,7 @@ async function apiSearchMemories(
   })
   if (query) params.set("query", query)
   const res = await fetch(`${baseUrl}/api/v1/memories/search?${params}`, {
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(40_000),
   })
   if (!res.ok) throw new Error(`Search failed: HTTP ${res.status}`)
   return res.json()
@@ -261,11 +261,24 @@ export default {
         if (searchOutcome.status === "fulfilled" && searchOutcome.value) {
           const memoriesGroups: any[] = (searchOutcome.value as any)?.result?.memories ?? []
           const formatted = formatSearchResults(memoriesGroups, pendingContent!)
-          if (formatted && channelId) queryResultCache.set(channelId, formatted)
+          if (channelId) {
+            if (formatted) {
+              queryResultCache.set(channelId, formatted)
+            } else {
+              queryResultCache.delete(channelId)
+            }
+          }
           log("DEBUG", "before_prompt_build", "Query cache updated", {
             channelId,
             groupId,
             groups: memoriesGroups.length,
+            cleared: !formatted,
+          })
+        } else if (channelId) {
+          queryResultCache.delete(channelId)
+          log("DEBUG", "before_prompt_build", "Query cache cleared (search failed)", {
+            channelId,
+            groupId,
           })
         }
       }
@@ -276,6 +289,7 @@ export default {
         sessionId,
         channelId,
         groupId,
+        user_query: pendingContent ?? null,
         query_injected: !!queryMem,
         injected_text: queryMem ?? "",
       })
