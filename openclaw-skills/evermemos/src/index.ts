@@ -381,6 +381,7 @@ export default {
       const sessionId = ctx.sessionId
       const groupId = groupIdBySession.get(sessionId)
       groupIdBySession.delete(sessionId)
+      if (!groupId) return
       // Clean up only the channel caches belonging to this session's groupId.
       // channelId is not available in session_end, so we scan groupIdByChannel.
       for (const [channelId, gid] of groupIdByChannel) {
