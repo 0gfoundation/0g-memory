@@ -12,6 +12,7 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import aiohttp
+from contextlib import nullcontext
 from typing import Optional
 import asyncio
 import random
@@ -20,6 +21,13 @@ from memory_layer.llm.protocol import LLMProvider, LLMError
 from core.observation.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Global semaphore shared across all OpenAIProvider instances.
+# Reads LLM_MAX_CONCURRENT once at import time; 0 means no limit.
+_max_concurrent = int(os.getenv("LLM_MAX_CONCURRENT", "0"))
+_global_llm_semaphore: asyncio.Semaphore | None = (
+    asyncio.Semaphore(_max_concurrent) if _max_concurrent > 0 else None
+)
 
 
 class OpenAIProvider(LLMProvider):
@@ -123,92 +131,93 @@ class OpenAIProvider(LLMProvider):
             try:
                 timeout = aiohttp.ClientTimeout(total=600)
                 proxy = os.environ.get("https_proxy") or os.environ.get("http_proxy")
-                async with aiohttp.ClientSession(timeout=timeout) as session:
-                    async with session.post(
-                        f"{self.base_url}/chat/completions", json=data, headers=headers,
-                        proxy=proxy,
-                    ) as response:
-                        chunks = []
-                        async for chunk in response.content.iter_any():
-                            chunks.append(chunk)
-                        test = b"".join(chunks).decode()
-                        response_data = json.loads(test)
-                        # print(response_data)
-                        # Handle error responses
-                        if response.status != 200:
-                            error_info = response_data.get('error', f"HTTP {response.status}") if isinstance(response_data, dict) else response_data
-                            if isinstance(error_info, dict):
-                                error_msg = error_info.get('message', f"HTTP {response.status}")
-                            else:
-                                error_msg = str(error_info)
-                            logger.error(
-                                f"❌ [OpenAI-{self.model}] HTTP error {response.status}:"
-                            )
-                            logger.error(f"   💬 Error message: {error_msg}")
-                            logger.error(f"   📄 Full response: {response_data}")
-                            # Debug: 429 Too Many Requests breakpoint debugging
-                            if response.status == 429:
-                                logger.warning(
-                                    f"429 Too Many Requests, waiting for 10 seconds"
+                async with (_global_llm_semaphore if _global_llm_semaphore is not None else nullcontext()):
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        async with session.post(
+                            f"{self.base_url}/chat/completions", json=data, headers=headers,
+                            proxy=proxy,
+                        ) as response:
+                            chunks = []
+                            async for chunk in response.content.iter_any():
+                                chunks.append(chunk)
+                            test = b"".join(chunks).decode()
+                            response_data = json.loads(test)
+                            # print(response_data)
+                            # Handle error responses
+                            if response.status != 200:
+                                error_info = response_data.get('error', f"HTTP {response.status}") if isinstance(response_data, dict) else response_data
+                                if isinstance(error_info, dict):
+                                    error_msg = error_info.get('message', f"HTTP {response.status}")
+                                else:
+                                    error_msg = str(error_info)
+                                logger.error(
+                                    f"❌ [OpenAI-{self.model}] HTTP error {response.status}:"
                                 )
-                                await asyncio.sleep(random.randint(5, 20))
+                                logger.error(f"   💬 Error message: {error_msg}")
+                                logger.error(f"   📄 Full response: {response_data}")
+                                # Debug: 429 Too Many Requests breakpoint debugging
+                                if response.status == 429:
+                                    logger.warning(
+                                        f"429 Too Many Requests, waiting for 10 seconds"
+                                    )
+                                    await asyncio.sleep(random.randint(5, 20))
 
-                            raise LLMError(f"HTTP Error {response.status}: {error_msg}")
+                                raise LLMError(f"HTTP Error {response.status}: {error_msg}")
 
-                        # Use time.perf_counter() for more precise time measurement
-                        end_time = time.perf_counter()
+                            # Use time.perf_counter() for more precise time measurement
+                            end_time = time.perf_counter()
 
-                        # Extract finish_reason
-                        finish_reason = response_data.get('choices', [{}])[0].get(
-                            'finish_reason', ''
-                        )
-                        if finish_reason == 'stop':
+                            # Extract finish_reason
+                            finish_reason = response_data.get('choices', [{}])[0].get(
+                                'finish_reason', ''
+                            )
+                            if finish_reason == 'stop':
+                                logger.debug(
+                                    f"[OpenAI-{self.model}] Finish reason: {finish_reason}"
+                                )
+                            else:
+                                logger.warning(
+                                    f"[OpenAI-{self.model}] Finish reason: {finish_reason}"
+                                )
+
+                            # Extract token usage information
+                            usage = response_data.get('usage', {})
+                            prompt_tokens = usage.get('prompt_tokens', 0)
+                            completion_tokens = usage.get('completion_tokens', 0)
+                            total_tokens = usage.get('total_tokens', 0)
+
+                            # Print detailed usage information
+
+                            logger.debug(f"[OpenAI-{self.model}] API call completed:")
                             logger.debug(
-                                f"[OpenAI-{self.model}] Finish reason: {finish_reason}"
+                                f"[OpenAI-{self.model}] Duration: {end_time - start_time:.2f}s"
                             )
-                        else:
-                            logger.warning(
-                                f"[OpenAI-{self.model}] Finish reason: {finish_reason}"
+                            # If the duration is too long
+                            if end_time - start_time > 30:
+                                logger.warning(
+                                    f"[OpenAI-{self.model}] Duration too long: {end_time - start_time:.2f}s"
+                                )
+                            logger.debug(
+                                f"[OpenAI-{self.model}] Prompt Tokens: {prompt_tokens:,}"
+                            )
+                            logger.debug(
+                                f"[OpenAI-{self.model}] Completion Tokens: {completion_tokens:,}"
+                            )
+                            logger.debug(
+                                f"[OpenAI-{self.model}] Total Tokens: {total_tokens:,}"
                             )
 
-                        # Extract token usage information
-                        usage = response_data.get('usage', {})
-                        prompt_tokens = usage.get('prompt_tokens', 0)
-                        completion_tokens = usage.get('completion_tokens', 0)
-                        total_tokens = usage.get('total_tokens', 0)
+                            # New: record statistics for current call (if statistics enabled)
+                            if self.enable_stats:
+                                self.current_call_stats = {
+                                    'prompt_tokens': prompt_tokens,
+                                    'completion_tokens': completion_tokens,
+                                    'total_tokens': total_tokens,
+                                    'duration': end_time - start_time,
+                                    'timestamp': time.time(),
+                                }
 
-                        # Print detailed usage information
-
-                        logger.debug(f"[OpenAI-{self.model}] API call completed:")
-                        logger.debug(
-                            f"[OpenAI-{self.model}] Duration: {end_time - start_time:.2f}s"
-                        )
-                        # If the duration is too long
-                        if end_time - start_time > 30:
-                            logger.warning(
-                                f"[OpenAI-{self.model}] Duration too long: {end_time - start_time:.2f}s"
-                            )
-                        logger.debug(
-                            f"[OpenAI-{self.model}] Prompt Tokens: {prompt_tokens:,}"
-                        )
-                        logger.debug(
-                            f"[OpenAI-{self.model}] Completion Tokens: {completion_tokens:,}"
-                        )
-                        logger.debug(
-                            f"[OpenAI-{self.model}] Total Tokens: {total_tokens:,}"
-                        )
-
-                        # New: record statistics for current call (if statistics enabled)
-                        if self.enable_stats:
-                            self.current_call_stats = {
-                                'prompt_tokens': prompt_tokens,
-                                'completion_tokens': completion_tokens,
-                                'total_tokens': total_tokens,
-                                'duration': end_time - start_time,
-                                'timestamp': time.time(),
-                            }
-
-                        return response_data['choices'][0]['message']['content']
+                            return response_data['choices'][0]['message']['content']
 
             except aiohttp.ClientError as e:
                 error_time = time.perf_counter()
