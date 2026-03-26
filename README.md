@@ -4,7 +4,7 @@ This project gives your AI agent memory that lasts forever. Every conversation �
 
 Unlike memory systems that rely on local storage, your memories here are stored on the [0G decentralized storage network](https://docs.0g.ai/concepts/storage), encrypted with a key only you hold, and persisted on-chain. Your memory survives hardware failures and is never held by any central server.
 
-Supported clients: **Claude Code** and **OpenCode**. `install.sh` detects which are installed and sets up the integration automatically.
+Supported clients: **Claude Code**, **OpenCode**, and **OpenClaw**. `install.sh` detects which are installed and sets up the integration automatically.
 
 ---
 
@@ -13,10 +13,10 @@ Supported clients: **Claude Code** and **OpenCode**. `install.sh` detects which 
 Three layers work together to deliver forever-persistent memory:
 
 **1. Automatic capture via client integration**
-`install.sh` registers hooks or plugins into your AI coding assistant. From that point on, every prompt you send, every response, and every tool call result is silently captured — no commands needed. At the start of each new session, recent memories are injected into the assistant's context automatically. Mid-session, when you reference past events, the assistant searches the memory store and incorporates the results before replying.
+`install.sh` registers hooks or plugins into your AI coding assistant. From that point on, every prompt you send, every response, and every tool call result is silently captured — no commands needed. For Claude Code and OpenCode, recent memories are injected at the start of each new session automatically. For all supported clients, mid-session semantic search retrieves relevant past context before each reply.
 
 **2. Structured memory extraction via EverMemOS**
-Raw conversation data is processed by [EverMemOS](https://github.com/EverMind-AI/EverMemOS/), an open-source memory system that extracts structured episodic memories, indexes them across MongoDB, Elasticsearch, Milvus, and Redis, and supports keyword, vector, hybrid, and agentic retrieval. Each project directory gets its own isolated memory namespace, so different codebases don't mix.
+Raw conversation data is processed by [EverMemOS](https://github.com/EverMind-AI/EverMemOS/), an open-source memory system that extracts structured episodic memories, indexes them across MongoDB, Elasticsearch, Milvus, and Redis, and supports keyword, vector, hybrid, and agentic retrieval. Memories are namespaced so different projects or sessions don't mix.
 
 **3. Decentralized persistence via 0G storage**
 This is what makes memory truly permanent. The memory system writes every memory to the [0G decentralized network](https://docs.0g.ai/concepts/storage) via the 0G storage SDK. Every memory is encrypted with a key generated at install time and stored only on your machine — no one else can read it. A local `zgs_kv` node runs as a read cache, syncing your memory stream from the blockchain so reads stay fast. Because data lives on-chain, it survives local hardware failures — when you restart on a new machine, the kv-server re-syncs your full history from the blockchain and restores everything.
@@ -30,7 +30,7 @@ This is what makes memory truly permanent. The memory system writes every memory
 | Requirement | Ubuntu | macOS |
 |---|---|---|
 | OS | Ubuntu 20.04+ | macOS 12+ |
-| [Claude Code](https://claude.ai/code) and/or [OpenCode](https://opencode.ai) | at least one must be installed | at least one must be installed |
+| [Claude Code](https://claude.ai/code), [OpenCode](https://opencode.ai), and/or [OpenClaw](https://openclaw.ai) | at least one must be installed | at least one must be installed |
 | Python 3.8+ ¹ | typically pre-installed | typically pre-installed |
 | [Homebrew](https://brew.sh) | — | [Appendix A](#appendix-a-installing-homebrew-on-macos) |
 | Docker 20.10+ | auto-installed if missing | [Appendix B](#appendix-b-installing-docker-on-macos) |
@@ -81,11 +81,13 @@ When startup completes successfully, you will see:
 ============================================================
 ```
 
-> If Claude Code or OpenCode is already running, **restart it** now so the hooks/plugins registered by `install.sh` take effect.
+> If Claude Code, OpenCode, or OpenClaw is already running, **restart it** now so the hooks/plugins registered by `install.sh` take effect. For OpenClaw, run `openclaw gateway restart`.
 
 ### 4. Verify Memory Works — A 2-Minute Test
 
-The memory backend runs silently in the background. The fastest way to confirm it is working is to plant a few facts, restart, and ask your assistant to recall them.
+The memory backend runs silently in the background. The fastest way to confirm it is working is to plant a few facts and ask your assistant to recall them.
+
+> **OpenClaw users:** memory is scoped per session, so you will verify recall within the **same session** — no restart needed. Send Step A, wait for the reply, then proceed to Step B.
 
 #### Step A — Seed session: tell your assistant specific facts
 
@@ -101,26 +103,20 @@ Please confirm you've noted these.
 
 Your assistant will acknowledge. You do not need to do anything else — everything is stored automatically.
 
-#### Step B — Close and reopen your assistant
+#### Step B — Verify recall
 
-Close and reopen your AI coding assistant. This starts a fresh session with no conversation history.
+> **Note:** the verification method differs by client.
 
-> **Important:** reopen your assistant in the **same project directory** as Step A. Memories are namespaced per project directory — a different directory will have no memories.
->
-> Claude Code / OpenCode: type `/exit` to quit, then reopen in the same directory.
+**Claude Code / OpenCode:**
 
-#### Step C — New session: ask your assistant to recall
-
-Send these questions one at a time:
+Type `/exit` to quit, then reopen your assistant in the **same project directory**. This starts a fresh session. Then send these questions one at a time:
 
 ```
 What database did we choose, and why?
 ```
-
 ```
 What was the root cause of the auth bug?
 ```
-
 ```
 What API style did we settle on?
 ```
@@ -133,7 +129,23 @@ What API style did we settle on?
 | Auth bug | JWT expiry was set in seconds instead of milliseconds |
 | API style | RESTful — GraphQL was ruled out after the team review |
 
-If your assistant answers correctly with the specific details (JSONB, milliseconds, GraphQL ruled out), memory is working. If your assistant says it has no memory of prior conversations, check [Verify everything is running](#verify-everything-is-running) in the Advanced Usage section.
+If your assistant answers correctly, memory is working.
+
+---
+
+**OpenClaw:**
+
+Cross-session memory retrieval is not currently supported — each session has its own isolated memory space. Instead, verify mid-session search within the **same session** where you sent Step A. Send a follow-up question referencing the facts you planted:
+
+```
+What database did we choose, and why?
+```
+
+Your assistant should retrieve the answer from memory and include it in the reply. If it does, memory is working.
+
+---
+
+If your assistant says it has no memory of prior conversations, check [Verify everything is running](#verify-everything-is-running) in the Advanced Usage section.
 
 ### 5. Stop & Resume
 
@@ -212,13 +224,13 @@ This is the core value: the longer you use your AI coding assistant, the richer 
 
 ### How memory works during a session
 
-| Moment | What happens |
-|--------|-------------|
-| Session start | Recent memories are fetched and injected into the assistant's context |
-| Every prompt you send | Your message is stored |
-| Every assistant reply | The response is stored |
-| Every tool call | Tool name and result are stored |
-| Question references past context (e.g. "last time", "previously", "continue where we left off") | The assistant automatically searches memory and incorporates the results |
+| Moment | Claude Code / OpenCode | OpenClaw |
+|--------|----------------------|----------|
+| Session start | Recent memories are fetched and injected into the assistant's context | — (OpenClaw maintains its own session history in the context window) |
+| Every prompt you send | Your message is stored | Your message is stored |
+| Every assistant reply | The response is stored | The response is stored |
+| Every tool call | Tool name and result are stored | Tool name and result are stored |
+| Each prompt (mid-session) | The assistant searches memory and injects relevant results | The assistant searches memory and injects relevant results |
 
 ### What `install.sh` does
 
@@ -227,6 +239,7 @@ This is the core value: the longer you use your AI coding assistant, the richer 
 - **Installs Python dependencies** into `.venv/` — the Python packages EverMemOS needs to run.
 - **Installs Claude Code skills and hooks** (if Claude Code is installed) — copies skills into `~/.claude/skills/` and registers hooks in `~/.claude/settings.json`. Hooks capture every prompt, response, and tool call automatically.
 - **Installs OpenCode plugin** (if OpenCode is installed) — copies the plugin into `~/.config/opencode/plugins/` and registers it in `~/.config/opencode/opencode.json`.
+- **Installs OpenClaw plugin** (if OpenClaw is installed) — links the plugin via `openclaw plugins install --link` and registers it in `~/.openclaw/openclaw.json`. Run `openclaw gateway restart` after installation to activate it.
 - **Generates `.0g_secrets`** — creates a stream ID and encryption key for the 0G KV storage layer. Think of the stream ID as a unique address for your personal memory store on the 0G decentralized network, and the encryption key as the password that protects it. These are generated once and reused across restarts.
 - **Downloads `zgs_kv`** — installs the 0G KV server binary into `0g_kv_server/`. This is a lightweight node that connects your machine to the 0G storage network, allowing EverMemOS to persist memories on-chain.
 
@@ -272,6 +285,7 @@ All log commands below must be run from the `0g-memory` project directory.
 | kv-server | `tail -f $(ls -t 0g_kv_server/kv_*.log \| head -1)` |
 | Claude Code hook activity | `tail -f ~/.claude/logs/hook_user_prompt.log` |
 | OpenCode plugin activity | `tail -f /tmp/evermemos_opencode.log` |
+| OpenClaw plugin activity | `tail -f /tmp/evermemos_openclaw.log` |
 
 To confirm the 2-minute test worked, run these after completing both the seed session and the recall session. You should see storage entries from the seed session and search entries from the recall session:
 
@@ -304,6 +318,10 @@ grep "sender_name=Claude (Tool)"     "$LOG" | wc -l
 # Activity by sender type — OpenCode
 grep "sender_name=OpenCode (Response)" "$LOG" | wc -l
 grep "sender_name=OpenCode (Tool)"     "$LOG" | wc -l
+
+# Activity by sender type — OpenClaw
+grep "sender_name=OpenClaw (Response)" "$LOG" | wc -l
+grep "sender_name=OpenClaw (Tool)"     "$LOG" | wc -l
 ```
 
 ### Uninstall — what gets removed
@@ -317,6 +335,7 @@ Permanently removes:
 - `.0g_secrets`, `.env`, `.venv/`
 - EverMemOS skills from `~/.claude/skills/` and hooks from `~/.claude/settings.json`
 - EverMemOS plugin from `~/.config/opencode/plugins/` and entry from `~/.config/opencode/opencode.json`
+- EverMemOS plugin entry from `~/.openclaw/openclaw.json`
 
 > After uninstalling, running `install.sh` again generates a new stream ID and encryption key — **previous memories are not recoverable**.
 
