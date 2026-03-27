@@ -3,6 +3,9 @@ from abc import ABC, abstractmethod
 from fastapi import Request, HTTPException
 
 from core.di.decorators import component
+from core.observation.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class AuthProvider(ABC):
@@ -24,6 +27,69 @@ class AuthProvider(ABC):
 
 
 @component(name="auth_provider")
+class ApiKeyAuthProviderImpl(AuthProvider):
+    """
+    Production auth provider for server-side deployment.
+
+    Validates Bearer <api_key> against the user_secrets MongoDB collection.
+    Uses bcrypt to verify the stored hash. Returns user_id on success.
+    """
+
+    async def get_optional_user_data_by_key(
+        self, api_key: str
+    ) -> Optional[Dict[str, Any]]:
+        """Validate a raw API key string and return user data, or None if invalid."""
+        try:
+            import asyncio
+            from infra_layer.adapters.out.persistence.document.user.user_secret import (
+                UserSecret,
+            )
+            import bcrypt as _bcrypt
+
+            loop = asyncio.get_running_loop()
+
+            # Scan user_secrets to find a matching api_key.
+            # In practice the number of users is small; for scale add a lookup index
+            # on a truncated key prefix.
+            async for secret in UserSecret.find_all():
+                # Run bcrypt in a thread pool to avoid blocking the event loop (~200ms).
+                key_bytes = api_key.encode()
+                hash_bytes = secret.api_key_hash.encode()
+                match = await loop.run_in_executor(
+                    None, _bcrypt.checkpw, key_bytes, hash_bytes
+                )
+                if match:
+                    from core.authorize.enums import Role
+
+                    return {
+                        "user_id": secret.user_id,
+                        "role": Role.USER.value,
+                        "zerog_stream_id": secret.zerog_stream_id,
+                        "zerog_encryption_key": secret.zerog_encryption_key,
+                        "zerog_wallet_key": secret.zerog_wallet_key,
+                    }
+            return None
+        except Exception as e:
+            logger.error("ApiKeyAuthProviderImpl error: %s", e)
+            return None
+
+    async def get_optional_user_data_from_request(
+        self, request: Request
+    ) -> Optional[Dict[str, Any]]:
+        auth_header = request.headers.get("authorization")
+        if not auth_header:
+            return None
+        api_key = auth_header.replace("Bearer ", "").strip()
+        if not api_key:
+            return None
+        return await self.get_optional_user_data_by_key(api_key)
+
+
+# ---------------------------------------------------------------------------
+# Legacy test provider — kept for local single-user mode (no auth required)
+# ---------------------------------------------------------------------------
+
+
 class TestAuthProviderImpl(AuthProvider):
     """Authentication provider implementation, responsible for handling authorization header and user context"""
 

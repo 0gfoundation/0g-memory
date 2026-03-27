@@ -81,6 +81,11 @@ class MemoryController(BaseController):
             "MemoryController initialized with MemoryManager and ConversationMetaService"
         )
 
+    @staticmethod
+    def _auth_user_id(request: FastAPIRequest):
+        """Return the authenticated user_id from request.state, or None in local mode."""
+        return getattr(request.state, "user_id", None)
+
     @post(
         "",
         response_model=MemorizeResponse,
@@ -162,6 +167,13 @@ class MemoryController(BaseController):
         try:
             # 1. Get JSON body from request (simple direct format)
             message_data = await request.json()
+
+            # In server mode, enforce sender == authenticated user_id.
+            auth_uid = self._auth_user_id(request)
+            if auth_uid:
+                message_data = dict(message_data)
+                message_data["sender"] = auth_uid
+
             logger.info(
                 "Received memorize request (single message): sender_name=%s, role=%s, content=%s",
                 message_data.get("sender_name"),
@@ -332,6 +344,11 @@ class MemoryController(BaseController):
                     if isinstance(body_data := json.loads(body), dict):
                         params.update(body_data)
 
+            # In server mode, enforce user_id from authentication
+            auth_uid = self._auth_user_id(fastapi_request)
+            if auth_uid:
+                params["user_id"] = auth_uid
+
             logger.info(
                 "Received fetch request: user_id=%s, memory_type=%s",
                 params.get("user_id"),
@@ -465,6 +482,11 @@ class MemoryController(BaseController):
                 with suppress(json.JSONDecodeError, TypeError):
                     if isinstance(body_data := json.loads(body), dict):
                         query_params.update(body_data)
+
+            # In server mode, enforce user_id from authentication
+            auth_uid = self._auth_user_id(fastapi_request)
+            if auth_uid:
+                query_params["user_id"] = auth_uid
 
             query_text = query_params.get("query")
             logger.info(
@@ -1031,6 +1053,11 @@ class MemoryController(BaseController):
                 with suppress(json.JSONDecodeError, TypeError):
                     if isinstance(body_data := json.loads(body), dict):
                         params.update(body_data)
+
+            # In server mode, enforce user_id from authentication
+            auth_uid = self._auth_user_id(fastapi_request)
+            if auth_uid:
+                params["user_id"] = auth_uid
 
             # Extract and validate parameters using DeleteMemoriesRequestDTO
             try:

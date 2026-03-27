@@ -12,6 +12,7 @@ from core.interface.controller.base_controller import BaseController
 from core.middleware.user_context_middleware import UserContextMiddleware
 from core.middleware.app_logic_middleware import AppLogicMiddleware
 from core.middleware.prometheus_middleware import PrometheusMiddleware
+from core.middleware.multi_user_auth_middleware import MultiUserAuthMiddleware
 from fastapi.middleware import Middleware
 
 from base_app import create_base_app
@@ -124,7 +125,12 @@ def create_business_app(
     fastapi_app.user_middleware.append(Middleware(AppLogicMiddleware))
     # Not directly interfacing with users
     # fastapi_app.user_middleware.append(Middleware(UserContextMiddleware))
-    
+
+    # Add server-side multi-user auth middleware (only active when SERVER_MODE=true)
+    import os
+    if os.getenv("SERVER_MODE", "false").lower() == "true":
+        fastapi_app.user_middleware.append(Middleware(MultiUserAuthMiddleware))
+
     # Add Prometheus HTTP metrics middleware
     fastapi_app.user_middleware.append(Middleware(PrometheusMiddleware))
 
