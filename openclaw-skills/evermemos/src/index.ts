@@ -25,6 +25,7 @@ function log(level: "INFO" | "DEBUG" | "ERROR", component: string, msg: string, 
 interface PluginConfig {
   baseUrl: string
   userId: string
+  apiKey: string
   searchTopK: number
 }
 
@@ -32,8 +33,14 @@ function resolveConfig(pluginConfig: Record<string, unknown> | undefined): Plugi
   return {
     baseUrl: String(pluginConfig?.apiBaseUrl ?? process.env.API_BASE_URL ?? "http://localhost:1995").replace(/\/$/, ""),
     userId: String(pluginConfig?.userId ?? process.env.EVERMEMOS_USER_ID ?? "openclaw_user"),
+    apiKey: String(pluginConfig?.apiKey ?? process.env.EVERMEMOS_API_KEY ?? ""),
     searchTopK: Number(pluginConfig?.searchTopK ?? 5),
   }
+}
+
+function authHeaders(apiKey: string): Record<string, string> {
+  if (!apiKey) return {}
+  return { Authorization: `Bearer ${apiKey}` }
 }
 
 /**
@@ -95,6 +102,7 @@ async function apiSearchMemories(
   baseUrl: string,
   userId: string,
   groupId: string,
+  apiKey: string,
   query: string,
   topK = 5,
 ): Promise<any> {
@@ -107,6 +115,7 @@ async function apiSearchMemories(
   })
   if (query) params.set("query", query)
   const res = await fetch(`${baseUrl}/api/v1/memories/search?${params}`, {
+    headers: authHeaders(apiKey),
     signal: AbortSignal.timeout(40_000),
   })
   if (!res.ok) throw new Error(`Search failed: HTTP ${res.status}`)
@@ -117,6 +126,7 @@ async function apiStoreMessage(
   baseUrl: string,
   userId: string,
   groupId: string,
+  apiKey: string,
   content: string,
   role: "user" | "assistant",
   senderName: string,
@@ -132,7 +142,7 @@ async function apiStoreMessage(
   }
   const res = await fetch(`${baseUrl}/api/v1/memories`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders(apiKey) },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(15_000),
   })
@@ -248,10 +258,10 @@ export default {
 
       if (needsStoreSearch) {
         const [, searchOutcome] = await Promise.allSettled([
-          apiStoreMessage(cfg.baseUrl, cfg.userId, groupId, pendingContent!, "user", "User").catch((e) =>
+          apiStoreMessage(cfg.baseUrl, cfg.userId, groupId, cfg.apiKey, pendingContent!, "user", "User").catch((e) =>
             log("ERROR", "before_prompt_build", "storeMessage(user) failed", String(e)),
           ),
-          apiSearchMemories(cfg.baseUrl, cfg.userId, groupId, pendingContent!, cfg.searchTopK).catch(
+          apiSearchMemories(cfg.baseUrl, cfg.userId, groupId, cfg.apiKey, pendingContent!, cfg.searchTopK).catch(
             (e) => {
               log("ERROR", "before_prompt_build", "searchMemories failed", String(e))
               return null
@@ -336,7 +346,7 @@ export default {
       if (!(await isServiceAvailable(cfg.baseUrl))) return
 
       // Fire-and-forget: don't block response rendering
-      apiStoreMessage(cfg.baseUrl, cfg.userId, groupId, fullText, "assistant", "OpenClaw (Response)").catch(
+      apiStoreMessage(cfg.baseUrl, cfg.userId, groupId, cfg.apiKey, fullText, "assistant", "OpenClaw (Response)").catch(
         (e) => log("ERROR", "llm_output", "storeMessage failed", String(e)),
       )
 
@@ -364,7 +374,7 @@ export default {
       const observation = formatToolObservation(event.toolName, event.params, event.result)
 
       // Fire-and-forget: don't block the tool pipeline
-      apiStoreMessage(cfg.baseUrl, cfg.userId, groupId, observation, "assistant", "OpenClaw (Tool)").catch(
+      apiStoreMessage(cfg.baseUrl, cfg.userId, groupId, cfg.apiKey, observation, "assistant", "OpenClaw (Tool)").catch(
         (e) => log("ERROR", "after_tool_call", "storeMessage failed", String(e)),
       )
 

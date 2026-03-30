@@ -214,6 +214,37 @@ def main():
     else:
         _info("OpenCode not detected (~/.config/opencode/ not found), skipping OpenCode config")
 
+    # ── 7. Update OpenClaw config (if OpenClaw is installed) ──────────────────
+    openclaw_config_path = Path.home() / ".openclaw" / "openclaw.json"
+    if openclaw_config_path.exists():
+        try:
+            with open(openclaw_config_path, "r", encoding="utf-8") as f:
+                oc_config = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            _warn(f"Could not read ~/.openclaw/openclaw.json: {e}, skipping OpenClaw config")
+            oc_config = None
+
+        if oc_config is not None:
+            plugin_id = "evermemos-openclaw"
+            plugins = oc_config.setdefault("plugins", {})
+            entries = plugins.setdefault("entries", {})
+            plugin_entry = entries.setdefault(plugin_id, {"enabled": True})
+            config_block = plugin_entry.setdefault("config", {})
+            config_block["apiBaseUrl"] = remote_url
+            config_block["userId"] = remote_user_id
+            config_block["apiKey"] = api_key
+            try:
+                tmp = openclaw_config_path.with_suffix(".json.tmp")
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(oc_config, f, indent=2, ensure_ascii=False)
+                    f.write("\n")
+                tmp.replace(openclaw_config_path)
+                _ok(f"Updated ~/.openclaw/openclaw.json (apiBaseUrl={remote_url})")
+            except OSError as e:
+                _warn(f"Failed to write OpenClaw config: {e}")
+    else:
+        _info("OpenClaw not detected (~/.openclaw/openclaw.json not found), skipping OpenClaw config")
+
 
 if __name__ == "__main__":
     main()

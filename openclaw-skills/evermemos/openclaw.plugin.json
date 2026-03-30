@@ -12,6 +12,10 @@
         "type": "string",
         "description": "User identifier for EverMemOS storage (default: openclaw_user)"
       },
+      "apiKey": {
+        "type": "string",
+        "description": "API key for authenticated EverMemOS servers (Scenario B/C, default: empty)"
+      },
       "searchTopK": {
         "type": "number",
         "description": "Number of search results to retrieve per query (default: 5)"
