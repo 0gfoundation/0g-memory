@@ -50,6 +50,9 @@ class EverMemOSClient:
 
         # Prepare request
         headers = {"Content-Type": "application/json"}
+        api_key = os.environ.get("EVERMEMOS_API_KEY", "")
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         body = json.dumps(data).encode("utf-8") if data else None
 
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
@@ -283,7 +286,7 @@ Examples:
     # Initialize client, derive group_id from cwd if not explicitly set
     user_id = os.environ.get("EVERMEMOS_USER_ID", "claude_code_user")
     client = EverMemOSClient(
-        base_url=os.environ.get("API_BASE_URL", "http://localhost:1995"),
+        base_url=os.environ.get("EVERMEMOS_BASE_URL") or os.environ.get("API_BASE_URL", "http://localhost:1995"),
         user_id=user_id,
         group_id=get_project_group_id(cwd=os.getcwd(), user_id=user_id),
     )

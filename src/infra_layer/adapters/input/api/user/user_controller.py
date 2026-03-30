@@ -77,6 +77,7 @@ class UserController(BaseController):
         request: FastAPIRequest,
         body: RegisterRequest,
     ) -> RegisterResponse:
+        import asyncio
         import bcrypt as _bcrypt
         from infra_layer.adapters.out.persistence.document.user.user_secret import (
             UserSecret,
@@ -92,7 +93,11 @@ class UserController(BaseController):
 
         # Generate credentials
         api_key = secrets.token_urlsafe(32)
-        api_key_hash = _bcrypt.hashpw(api_key.encode(), _bcrypt.gensalt()).decode()
+        api_key_bytes = api_key.encode()
+        loop = asyncio.get_running_loop()
+        salt = await loop.run_in_executor(None, _bcrypt.gensalt)
+        hash_bytes = await loop.run_in_executor(None, _bcrypt.hashpw, api_key_bytes, salt)
+        api_key_hash = hash_bytes.decode()
         stream_id = secrets.token_hex(32)   # 64-char hex, same format as local .0g_secrets
         enc_key_hex = secrets.token_hex(32)  # 256-bit AES key
 

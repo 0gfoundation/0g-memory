@@ -640,10 +640,14 @@ class SetupManager:
                 self.print_warning(f"Could not read {settings_path}: {e}, will recreate")
                 settings = {}
 
-        # Ensure env vars are set so hooks know where to reach the backend
+        # Ensure env vars are set so hooks know where to reach the backend.
+        # Use setdefault so that remote_setup.py values (written afterwards) are
+        # not overwritten if install_claude_hooks() is called again later.
         if "env" not in settings:
             settings["env"] = {}
-        settings["env"].setdefault("API_BASE_URL", "http://localhost:1995")
+        settings["env"].setdefault("EVERMEMOS_BASE_URL", "http://localhost:1995")
+        settings["env"].setdefault("API_BASE_URL", "http://localhost:1995")  # backward compat
+        settings["env"].setdefault("EVERMEMOS_API_KEY", "")   # empty = no auth (local mode)
         settings["env"].setdefault("EVERMEMOS_USER_ID", "claude_code_user")
 
         if "hooks" not in settings:
@@ -1025,6 +1029,57 @@ class SetupManager:
 
         return True
 
+    def run_hooks_only(self) -> bool:
+        """Run only the editor integration steps (Steps 5-7), skipping Docker/deps.
+
+        Used in remote-client mode where Docker is not required.
+        """
+        self.print_header("EverMemOS Editor Integration (Hooks Only)")
+
+        # Step 5: Install Claude Code integration (if Claude Code is installed)
+        if self.is_claude_code_installed():
+            if not self.install_claude_hooks():
+                self.print_warning(
+                    "Claude Code hook installation failed — "
+                    "hooks won't auto-record across all projects. "
+                    "You can re-run setup to retry."
+                )
+        else:
+            self.print_info(
+                "Claude Code not detected ('claude' not in PATH and ~/.claude/ not found), "
+                "skipping Claude Code integration."
+            )
+
+        # Step 6: Install OpenCode integration (if OpenCode is installed)
+        if self.is_opencode_installed():
+            if not self.install_opencode_plugin():
+                self.print_warning(
+                    "OpenCode plugin installation failed — "
+                    "you can re-run setup to retry."
+                )
+        else:
+            self.print_info(
+                "OpenCode not detected ('opencode' not in PATH, ~/.config/opencode/ and "
+                "~/.opencode/bin/opencode not found), skipping OpenCode integration. "
+                "Install OpenCode first, then re-run setup to enable it."
+            )
+
+        # Step 7: Install OpenClaw integration (if OpenClaw is installed)
+        if self.is_openclaw_installed():
+            if not self.install_openclaw_plugin():
+                self.print_warning(
+                    "OpenClaw plugin installation failed — "
+                    "you can re-run setup to retry."
+                )
+        else:
+            self.print_info(
+                "OpenClaw not detected ('openclaw' not in PATH and ~/.openclaw/ not found), "
+                "skipping OpenClaw integration. "
+                "Install OpenClaw first, then re-run setup to enable it."
+            )
+
+        return True
+
 
 def main():
     """Main entry point"""
@@ -1044,6 +1099,11 @@ def main():
         action="store_true",
         help="Run in non-interactive mode"
     )
+    parser.add_argument(
+        "--hooks-only",
+        action="store_true",
+        help="Only install editor integrations (Claude Code / OpenCode / OpenClaw), skip Docker/deps. Used for remote-client mode."
+    )
 
     args = parser.parse_args()
 
@@ -1051,7 +1111,10 @@ def main():
     manager = SetupManager(project_dir=args.project_dir)
 
     # Run setup
-    success = manager.run_setup(non_interactive=args.non_interactive)
+    if args.hooks_only:
+        success = manager.run_hooks_only()
+    else:
+        success = manager.run_setup(non_interactive=args.non_interactive)
 
     # Exit with appropriate code
     sys.exit(0 if success else 1)
