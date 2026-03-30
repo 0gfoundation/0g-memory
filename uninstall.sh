@@ -179,6 +179,15 @@ else
     echo "  ℹ️  $OPENCODE_PLUGIN_DIR not found, skipping"
 fi
 
+# Remove remote config file written by remote_setup.py
+OPENCODE_EVERMEMOS_CONFIG="$HOME/.config/opencode/evermemos.json"
+if [ -f "$OPENCODE_EVERMEMOS_CONFIG" ]; then
+    rm -f "$OPENCODE_EVERMEMOS_CONFIG"
+    echo "  ✅ Deleted $OPENCODE_EVERMEMOS_CONFIG"
+else
+    echo "  ℹ️  $OPENCODE_EVERMEMOS_CONFIG not found, skipping"
+fi
+
 # Remove plugin entry from ~/.config/opencode/opencode.json
 python3 - <<'EOF'
 import json

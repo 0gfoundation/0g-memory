@@ -778,10 +778,15 @@ class SetupManager:
         # Remove it if a previous install accidentally wrote it.
         config.pop("env", None)
 
-        # Environment variables (API_BASE_URL, EVERMEMOS_USER_ID) are read
-        # from the shell environment. The plugin uses sensible defaults:
-        #   API_BASE_URL       → http://localhost:1995
-        #   EVERMEMOS_USER_ID  → opencode_user
+        # Config priority for the plugin (highest → lowest):
+        #   1. Shell environment variables (set in ~/.bashrc or ~/.zshrc)
+        #   2. ~/.config/opencode/evermemos.json  (written by remote_setup.py for Scenario C)
+        #   3. Built-in defaults
+        # Relevant variables and their defaults:
+        #   EVERMEMOS_BASE_URL  → http://localhost:1995  (preferred)
+        #   API_BASE_URL        → http://localhost:1995  (fallback)
+        #   EVERMEMOS_USER_ID   → opencode_user
+        #   EVERMEMOS_API_KEY   → (empty, required for Scenario B/C auth)
 
         # Register plugin using absolute path (tilde is not always resolved by OpenCode)
         plugin_entry = f"file://{Path.home()}/.config/opencode/plugins/evermemos/src/index.ts"

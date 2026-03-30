@@ -191,6 +191,29 @@ def main():
         _fail(f"Failed to write {settings_path}: {e}")
         sys.exit(1)
 
+    # ── 6. Update OpenCode config (if OpenCode is installed) ──────────────────
+    opencode_config_dir = Path.home() / ".config" / "opencode"
+    if opencode_config_dir.exists():
+        evermemos_config_path = opencode_config_dir / "evermemos.json"
+        try:
+            with open(evermemos_config_path, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "baseUrl": remote_url,
+                        "userId": remote_user_id,
+                        "apiKey": api_key,
+                    },
+                    f,
+                    indent=2,
+                    ensure_ascii=False,
+                )
+                f.write("\n")
+            _ok(f"Updated ~/.config/opencode/evermemos.json (baseUrl={remote_url})")
+        except OSError as e:
+            _warn(f"Failed to write OpenCode config: {e}")
+    else:
+        _info("OpenCode not detected (~/.config/opencode/ not found), skipping OpenCode config")
+
 
 if __name__ == "__main__":
     main()

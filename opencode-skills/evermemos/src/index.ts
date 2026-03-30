@@ -1,5 +1,7 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin"
-import { appendFileSync } from "fs"
+import { appendFileSync, readFileSync } from "fs"
+import { homedir } from "os"
+import { join } from "path"
 
 // ─── Logging ──────────────────────────────────────────────────────────────────
 
@@ -20,12 +22,44 @@ function log(level: "INFO" | "DEBUG" | "ERROR", component: string, msg: string, 
   }
 }
 
+// ─── File-based config (for Scenario C: remote client) ────────────────────────
+//
+// remote_setup.py writes ~/.config/opencode/evermemos.json when the user runs
+// ./install.sh with EVERMEMOS_REMOTE_URL set. The plugin reads it as a fallback
+// when env vars are not set in the shell environment.
+
+interface FileConfig {
+  baseUrl?: string
+  userId?: string
+  apiKey?: string
+}
+
+let _fileConfig: FileConfig | null = null
+
+function readFileConfig(): FileConfig {
+  if (_fileConfig !== null) return _fileConfig
+  try {
+    const configPath = join(homedir(), ".config", "opencode", "evermemos.json")
+    _fileConfig = JSON.parse(readFileSync(configPath, "utf-8")) as FileConfig
+  } catch {
+    _fileConfig = {}
+  }
+  return _fileConfig
+}
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 function getConfig() {
+  const fc = readFileConfig()
   return {
-    baseUrl: (process.env.API_BASE_URL ?? "http://localhost:1995").replace(/\/$/, ""),
-    userId: process.env.EVERMEMOS_USER_ID ?? "opencode_user",
+    baseUrl: (
+      process.env.EVERMEMOS_BASE_URL ??
+      process.env.API_BASE_URL ??
+      fc.baseUrl ??
+      "http://localhost:1995"
+    ).replace(/\/$/, ""),
+    userId: process.env.EVERMEMOS_USER_ID ?? fc.userId ?? "opencode_user",
+    apiKey: process.env.EVERMEMOS_API_KEY ?? fc.apiKey ?? "",
   }
 }
 
@@ -43,6 +77,13 @@ function getProjectGroupId(directory: string, userId: string): string {
   if (explicit) return explicit
   if (directory) return `project_${directory}_${userId}`
   return "project_default"
+}
+
+// ─── Auth headers ─────────────────────────────────────────────────────────────
+
+function authHeaders(apiKey: string): Record<string, string> {
+  if (!apiKey) return {}
+  return { Authorization: `Bearer ${apiKey}` }
 }
 
 // ─── Health check (with 30-second cache) ─────────────────────────────────────
@@ -73,12 +114,13 @@ async function isServiceAvailable(baseUrl: string): Promise<boolean> {
 // ─── EverMemOS API ────────────────────────────────────────────────────────────
 
 /**
- * Search for relevant memories (GET with JSON body, same as Python client).
+ * Search for relevant memories (GET with query params).
  */
 async function apiSearchMemories(
   baseUrl: string,
   userId: string,
   groupId: string,
+  apiKey: string,
   query: string,
   method = "hybrid",
   topK = 5,
@@ -92,6 +134,7 @@ async function apiSearchMemories(
   })
   if (query) params.set("query", query)
   const res = await fetch(`${baseUrl}/api/v1/memories/search?${params}`, {
+    headers: authHeaders(apiKey),
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error(`Search failed: HTTP ${res.status}`)
@@ -106,6 +149,7 @@ async function apiStoreMessage(
   baseUrl: string,
   userId: string,
   groupId: string,
+  apiKey: string,
   content: string,
   role: "user" | "assistant",
   senderName: string,
@@ -121,7 +165,7 @@ async function apiStoreMessage(
   }
   const res = await fetch(`${baseUrl}/api/v1/memories`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders(apiKey) },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(15_000),
   })
@@ -136,6 +180,7 @@ async function apiFetchRecentMemories(
   baseUrl: string,
   userId: string,
   groupId: string,
+  apiKey: string,
   limit = 50,
 ): Promise<any> {
   const params = new URLSearchParams({
@@ -146,6 +191,7 @@ async function apiFetchRecentMemories(
     sort_order: "desc",
   })
   const res = await fetch(`${baseUrl}/api/v1/memories?${params}`, {
+    headers: authHeaders(apiKey),
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error(`FetchRecent failed: HTTP ${res.status}`)
@@ -280,7 +326,7 @@ export default (async ({ project, directory }: PluginInput) => {
         let pendingMessages: any[] = []
 
         try {
-          const res = await apiFetchRecentMemories(cfg.baseUrl, cfg.userId, groupId, 50)
+          const res = await apiFetchRecentMemories(cfg.baseUrl, cfg.userId, groupId, cfg.apiKey, 50)
           memories = res?.result?.memories ?? []
         } catch (e) {
           log("ERROR", "session.created", "apiFetchRecentMemories failed", String(e))
@@ -288,7 +334,7 @@ export default (async ({ project, directory }: PluginInput) => {
 
         try {
           // Use empty query to fetch all pending messages (same as Python version)
-          const res = await apiSearchMemories(cfg.baseUrl, cfg.userId, groupId, "", "hybrid", 50)
+          const res = await apiSearchMemories(cfg.baseUrl, cfg.userId, groupId, cfg.apiKey, "", "hybrid", 50)
           pendingMessages = res?.result?.pending_messages ?? []
         } catch (e) {
           log("ERROR", "session.created", "fetchPendingMessages failed", String(e))
@@ -353,10 +399,10 @@ export default (async ({ project, directory }: PluginInput) => {
       // Run store and search concurrently to minimize latency.
       // Both have .catch() so Promise.all won't reject on individual failures.
       const [, searchOutcome] = await Promise.all([
-        apiStoreMessage(cfg.baseUrl, cfg.userId, groupId, userText, "user", "User").catch((e) =>
+        apiStoreMessage(cfg.baseUrl, cfg.userId, groupId, cfg.apiKey, userText, "user", "User").catch((e) =>
           log("ERROR", "chat.message", "storeMessage failed", String(e)),
         ),
-        apiSearchMemories(cfg.baseUrl, cfg.userId, groupId, userText, "hybrid", 5).catch((e) => {
+        apiSearchMemories(cfg.baseUrl, cfg.userId, groupId, cfg.apiKey, userText, "hybrid", 5).catch((e) => {
           log("ERROR", "chat.message", "searchMemories failed", String(e))
           return null
         }),
@@ -414,6 +460,7 @@ export default (async ({ project, directory }: PluginInput) => {
         cfg.baseUrl,
         cfg.userId,
         groupId,
+        cfg.apiKey,
         observation,
         "assistant",
         "OpenCode (Tool)",
@@ -443,6 +490,7 @@ export default (async ({ project, directory }: PluginInput) => {
         cfg.baseUrl,
         cfg.userId,
         groupId,
+        cfg.apiKey,
         text,
         "assistant",
         "OpenCode (Response)",

@@ -13,17 +13,27 @@ This plugin integrates [EverMemOS](https://github.com/0gfoundation/0g-memory) wi
 
 ## Requirements
 
-- EverMemOS backend running at `http://localhost:1995` (start with `./start_service.sh`)
+- EverMemOS backend accessible (local or remote)
 - Bun runtime (used by OpenCode to load plugins)
 
 ## Configuration
 
-The plugin uses sensible defaults and works out of the box. To override, set these environment variables in your shell profile (`~/.bashrc` or `~/.zshrc`):
+### Local mode (Scenario A)
+
+Works out of the box with no configuration. The plugin connects to `http://localhost:1995` with no authentication.
+
+### Remote server mode (Scenario B / C)
+
+Run `./install.sh` with `EVERMEMOS_REMOTE_URL` set in `.env` — credentials are configured automatically.
+
+To override manually, set these environment variables in your shell profile (`~/.bashrc` or `~/.zshrc`):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `API_BASE_URL` | `http://localhost:1995` | EverMemOS backend URL |
+| `EVERMEMOS_BASE_URL` | `http://localhost:1995` | EverMemOS backend URL (preferred) |
+| `API_BASE_URL` | `http://localhost:1995` | EverMemOS backend URL (fallback) |
 | `EVERMEMOS_USER_ID` | `opencode_user` | Your user identity |
+| `EVERMEMOS_API_KEY` | _(empty)_ | API key for authenticated servers (Scenario B/C) |
 | `EVERMEMOS_GROUP_ID` | _(auto-derived)_ | Project group ID — auto-derived from project path if not set |
 
 ## Logs
