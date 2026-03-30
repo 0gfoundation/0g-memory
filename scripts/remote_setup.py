@@ -63,14 +63,14 @@ def main():
     env_vars = _read_kv_file(project_dir / ".env")
 
     remote_url = env_vars.get("EVERMEMOS_REMOTE_URL", "").rstrip("/")
-    remote_user_id = env_vars.get("EVERMEMOS_REMOTE_USER_ID", "")
+    remote_user_id = env_vars.get("EVERMEMOS_USER_ID", "")
     wallet_key = env_vars.get("ZEROG_WALLET_KEY", "")
 
     if not remote_url:
         _fail("EVERMEMOS_REMOTE_URL is not set in .env")
         sys.exit(1)
     if not remote_user_id:
-        _fail("EVERMEMOS_REMOTE_USER_ID is required when EVERMEMOS_REMOTE_URL is set")
+        _fail("EVERMEMOS_USER_ID is required when EVERMEMOS_REMOTE_URL is set")
         sys.exit(1)
     if not wallet_key:
         _fail("ZEROG_WALLET_KEY is required for remote registration (used for 0G storage)")
@@ -83,10 +83,10 @@ def main():
 
     if api_key:
         _info(f"Credentials already stored in {secrets_path.name}, skipping registration")
-        stored_user_id = secrets.get("EVERMEMOS_REMOTE_USER_ID", remote_user_id)
+        stored_user_id = secrets.get("EVERMEMOS_USER_ID", remote_user_id)
         if stored_user_id != remote_user_id:
             _warn(
-                f"EVERMEMOS_REMOTE_USER_ID in .env ({remote_user_id}) differs from "
+                f"EVERMEMOS_USER_ID in .env ({remote_user_id}) differs from "
                 f"stored user ({stored_user_id}). Using stored user."
             )
             remote_user_id = stored_user_id
@@ -140,7 +140,7 @@ def main():
                     f"       Contact the server admin to reset your API key, then:\n"
                     f"       1. Re-run ./install.sh  (it will retry registration)\n"
                     f"       OR manually create .evermemos_remote_secrets with:\n"
-                    f"          EVERMEMOS_REMOTE_USER_ID={remote_user_id}\n"
+                    f"          EVERMEMOS_USER_ID={remote_user_id}\n"
                     f"          EVERMEMOS_REMOTE_API_KEY=<your_api_key>"
                 )
             else:
@@ -156,7 +156,7 @@ def main():
 
         # ── 4. Store credentials ──────────────────────────────────────────────
         _write_kv_file(secrets_path, {
-            "EVERMEMOS_REMOTE_USER_ID": remote_user_id,
+            "EVERMEMOS_USER_ID": remote_user_id,
             "EVERMEMOS_REMOTE_API_KEY": api_key,
         })
         _ok(f"Registered successfully. Credentials saved to {secrets_path.name}")
