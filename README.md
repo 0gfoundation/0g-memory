@@ -25,6 +25,9 @@ This is what makes memory truly permanent. The memory system writes every memory
 
 ## Quick Start
 
+> **Running your own local instance (Scenario A)?** Follow the steps below.
+> **Connecting to a remote EverMemOS server (Scenario C)?** Skip to [Appendix E](#appendix-e-scenario-c--remote-client-setup).
+
 ### Prerequisites
 
 | Requirement | Ubuntu | macOS |
@@ -35,9 +38,12 @@ This is what makes memory truly permanent. The memory system writes every memory
 | [Homebrew](https://brew.sh) | — | [Appendix A](#appendix-a-installing-homebrew-on-macos) |
 | Docker 20.10+ | auto-installed if missing | [Appendix B](#appendix-b-installing-docker-on-macos) |
 | [uv](https://astral.sh/uv/) | auto-installed if missing | auto-installed via brew if missing |
+| 0G testnet wallet ² | [Appendix C](#appendix-c-getting-your-zerog_wallet_key) | [Appendix C](#appendix-c-getting-your-zerog_wallet_key) |
 | RAM / Disk | 4 GB RAM, 10 GB free disk | 4 GB RAM, 10 GB free disk |
 
 > ¹ Python 3.8+ is required only to run the installer. The application itself requires Python 3.12, which **uv downloads and manages automatically** — you do not need to install 3.12 yourself.
+>
+> ² Getting testnet tokens requires emailing the 0G admin and may take **hours to 1–2 days**. **Start this first** before proceeding — see [Appendix C](#appendix-c-getting-your-zerog_wallet_key) for step-by-step instructions. You can complete the rest of the setup while you wait.
 
 ### 1. Install
 
@@ -419,3 +425,74 @@ ZEROG_WALLET_KEY=<your 64-character hex private key here>
 ```
 
 > ⚠️ **Security reminder:** never share your private key, never commit it to version control. Anyone with this key has full control of the wallet.
+
+### Appendix E: Scenario C — Remote Client Setup
+
+Use this appendix if someone else is hosting an EverMemOS server and you want to connect your AI coding assistant (Claude Code, OpenCode, or OpenClaw) to it — without running any local services yourself.
+
+#### Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| Claude Code, OpenCode, and/or OpenClaw | at least one must be installed |
+| Python 3.8+ | typically pre-installed |
+| Remote server URL | provided by the server administrator |
+| `ZEROG_WALLET_KEY` | see [Appendix C](#appendix-c-getting-your-zerog_wallet_key) — your key is sent to the server at registration and used to write your memories to the 0G network on your behalf |
+
+> **Note on `ZEROG_WALLET_KEY`:** even though you are not running a local service, your wallet key is required. The remote server stores it and uses it to write your encrypted memories to the 0G decentralized network — each user owns their own private 0G stream.
+
+#### Step 1 — Clone the repository
+
+```bash
+git clone https://github.com/0gfoundation/0g-memory.git
+cd 0g-memory
+```
+
+#### Step 2 — Edit `.env`
+
+Copy the template and fill in three values:
+
+```bash
+cp env.template.0g.example .env
+```
+
+Open `.env` and set:
+
+```bash
+EVERMEMOS_REMOTE_URL=http://<server-ip>:<port>    # provided by the server admin
+EVERMEMOS_USER_ID=<your-chosen-username>           # must be unique on that server
+ZEROG_WALLET_KEY=<your-64-char-hex-private-key>   # see Appendix C
+```
+
+Leave everything else at defaults.
+
+#### Step 3 — Run the installer
+
+```bash
+./install.sh
+```
+
+Because `EVERMEMOS_REMOTE_URL` is set, `install.sh` automatically:
+
+1. Installs the AI assistant integration only (no Docker, no local service needed)
+2. Registers your username on the remote server and receives an API key
+3. Stores credentials in `.evermemos_remote_secrets`
+4. Configures your AI assistant to use the remote server and authenticate with the API key:
+   - **Claude Code** — updates `~/.claude/settings.json` with `EVERMEMOS_BASE_URL`, `EVERMEMOS_USER_ID`, and `EVERMEMOS_API_KEY`
+   - **OpenCode** — writes `~/.config/opencode/evermemos.json` with `baseUrl`, `userId`, and `apiKey`
+   - **OpenClaw** — updates `~/.openclaw/openclaw.json` with `apiBaseUrl`, `userId`, and `apiKey`
+
+**OpenClaw only:** run `openclaw gateway restart` after the installer finishes to activate the plugin.
+
+#### Step 4 — Verify
+
+Start your AI coding assistant. Follow the same [2-minute test](#4-verify-memory-works--a-2-minute-test) from the Quick Start to confirm memory is working.
+
+- **Claude Code / OpenCode:** follow the "Claude Code / OpenCode" instructions in Step B (type `/exit`, reopen, ask questions).
+- **OpenClaw:** follow the "OpenClaw" instructions in Step B (verify within the same session).
+
+#### Notes
+
+- You do **not** need to run `./start_service.sh` — there is no local service to start.
+- To uninstall, run `./uninstall.sh`. This removes the local integration and credentials but does **not** delete your memories from the remote server.
+- If registration fails with "user already exists", contact the server admin to reset your API key, or manually create `.evermemos_remote_secrets` with your credentials.
