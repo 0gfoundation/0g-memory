@@ -57,7 +57,7 @@ PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.v
 echo "✅ Python $PYTHON_VERSION (uv will manage Python 3.12 for the application)"
 
 # ── Early: create .env from template if it doesn't exist ─────────────────────
-# Must happen in bash BEFORE any Python scripts run, so that EVERMEMOS_REMOTE_URL
+# Must happen in bash BEFORE any Python scripts run, so that MEMORY_REMOTE_URL
 # can be read for remote-mode detection below.
 ENV_FILE="$SCRIPT_DIR/.env"
 TEMPLATE_FILE="$SCRIPT_DIR/env.template.0g.example"
@@ -72,24 +72,26 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 # ── Remote mode detection (must be BEFORE setup.py, which requires Docker) ───
-REMOTE_URL=$(grep '^EVERMEMOS_REMOTE_URL=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' \r')
+REMOTE_URL=$(grep '^MEMORY_REMOTE_URL=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' \r')
 if [ -n "$REMOTE_URL" ]; then
     echo ""
-    echo "▶  Remote mode detected (EVERMEMOS_REMOTE_URL=$REMOTE_URL)"
+    echo "▶  Remote mode detected (MEMORY_REMOTE_URL=$REMOTE_URL)"
     echo "   Installing editor integrations only (no Docker required)..."
     echo ""
     python3 scripts/setup.py --hooks-only
     echo ""
-    echo "▶  Registering with remote server and configuring Claude Code..."
+    echo "▶  Registering with remote server and configuring AI assistants..."
     echo ""
     python3 scripts/remote_setup.py
     echo ""
     echo "============================================================"
     echo "  ✅ Remote setup complete!"
     echo ""
-    echo "  Claude Code will now use the remote EverMemOS server."
+    echo "  Your AI coding assistant(s) will now use the remote EverMemOS server."
     echo "  Credentials stored in: .evermemos_remote_secrets"
     echo "  No local service needs to be started."
+    echo ""
+    echo "  ℹ️  If OpenClaw was configured, run: openclaw gateway restart"
     echo "============================================================"
     echo ""
     exit 0
@@ -262,7 +264,7 @@ echo "     Then configure each AI assistant you use with the returned api_key:"
 echo ""
 echo "     Claude Code — update these values in ~/.claude/settings.json (env section):"
 echo "       \"EVERMEMOS_API_KEY\": \"<api_key>\""
-echo "       \"EVERMEMOS_USER_ID\": \"<your_id>\""
+echo "       \"MEMORY_USER_ID\": \"<your_id>\""
 echo "       (both keys already exist — replace the placeholder values)"
 echo ""
 echo "     OpenCode — create/update ~/.config/opencode/evermemos.json:"

@@ -25,7 +25,7 @@ function log(level: "INFO" | "DEBUG" | "ERROR", component: string, msg: string, 
 // ─── File-based config (for Scenario C: remote client) ────────────────────────
 //
 // remote_setup.py writes ~/.config/opencode/evermemos.json when the user runs
-// ./install.sh with EVERMEMOS_REMOTE_URL set. The plugin reads it as a fallback
+// ./install.sh with MEMORY_REMOTE_URL set. The plugin reads it as a fallback
 // when env vars are not set in the shell environment.
 
 interface FileConfig {
@@ -53,12 +53,11 @@ function getConfig() {
   const fc = readFileConfig()
   return {
     baseUrl: (
-      process.env.EVERMEMOS_BASE_URL ??
       process.env.API_BASE_URL ??
       fc.baseUrl ??
       "http://localhost:1995"
     ).replace(/\/$/, ""),
-    userId: process.env.EVERMEMOS_USER_ID ?? fc.userId ?? "opencode_user",
+    userId: process.env.MEMORY_USER_ID ?? fc.userId ?? "opencode_user",
     apiKey: process.env.EVERMEMOS_API_KEY ?? fc.apiKey ?? "",
   }
 }

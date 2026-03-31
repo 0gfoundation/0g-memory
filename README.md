@@ -475,7 +475,7 @@ Share the server URL with your users (e.g. `http://your-server-ip:1995` or `http
 
 #### Step 3 — Users register and connect
 
-Each user runs `./install.sh` on their own machine with `EVERMEMOS_REMOTE_URL` set to your server URL. The installer registers them automatically and configures their AI assistant. See [Appendix E](#appendix-e-scenario-c--remote-client-setup).
+Each user runs `./install.sh` on their own machine with `MEMORY_REMOTE_URL` set to your server URL. The installer registers them automatically and configures their AI assistant. See [Appendix E](#appendix-e-scenario-c--remote-client-setup).
 
 Each user needs their own EVM wallet (`ZEROG_WALLET_KEY`) — the server stores it to write their encrypted memories to the 0G network on their behalf.
 
@@ -504,7 +504,7 @@ Then configure your AI assistant with the returned credentials:
 - **Claude Code** — update these values in `~/.claude/settings.json` (env section):
   ```
   "EVERMEMOS_API_KEY": "<api_key>"
-  "EVERMEMOS_USER_ID": "<your_id>"
+  "MEMORY_USER_ID": "<your_id>"
   ```
   (both keys already exist from `install.sh` — replace the placeholder values)
 
@@ -552,8 +552,8 @@ cp env.template.0g.example .env
 Open `.env` and set:
 
 ```bash
-EVERMEMOS_REMOTE_URL=http://<server-ip>:<port>    # provided by the server admin
-EVERMEMOS_USER_ID=<your-chosen-username>           # must be unique on that server
+MEMORY_REMOTE_URL=http://<server-ip>:<port>    # provided by the server admin
+MEMORY_USER_ID=<your-chosen-username>           # must be unique on that server
 ZEROG_WALLET_KEY=<your-64-char-hex-private-key>   # see Appendix C
 ```
 
@@ -565,13 +565,13 @@ Leave everything else at defaults.
 ./install.sh
 ```
 
-Because `EVERMEMOS_REMOTE_URL` is set, `install.sh` automatically:
+Because `MEMORY_REMOTE_URL` is set, `install.sh` automatically:
 
 1. Installs the AI assistant integration only (no Docker, no local service needed)
 2. Registers your username on the remote server and receives an API key
 3. Stores credentials in `.evermemos_remote_secrets`
 4. Configures your AI assistant to use the remote server and authenticate with the API key:
-   - **Claude Code** — updates `~/.claude/settings.json` with `EVERMEMOS_BASE_URL`, `EVERMEMOS_USER_ID`, and `EVERMEMOS_API_KEY`
+   - **Claude Code** — updates `~/.claude/settings.json` with `API_BASE_URL`, `MEMORY_USER_ID`, and `EVERMEMOS_API_KEY`
    - **OpenCode** — writes `~/.config/opencode/evermemos.json` with `baseUrl`, `userId`, and `apiKey`
    - **OpenClaw** — updates `~/.openclaw/openclaw.json` with `apiBaseUrl`, `userId`, and `apiKey`
 

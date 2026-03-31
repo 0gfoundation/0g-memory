@@ -645,10 +645,9 @@ class SetupManager:
         # not overwritten if install_claude_hooks() is called again later.
         if "env" not in settings:
             settings["env"] = {}
-        settings["env"].setdefault("EVERMEMOS_BASE_URL", "http://localhost:1995")
-        settings["env"].setdefault("API_BASE_URL", "http://localhost:1995")  # backward compat
+        settings["env"].setdefault("API_BASE_URL", "http://localhost:1995")
         settings["env"].setdefault("EVERMEMOS_API_KEY", "")   # empty = no auth (local mode)
-        settings["env"].setdefault("EVERMEMOS_USER_ID", "claude_code_user")
+        settings["env"].setdefault("MEMORY_USER_ID", "claude_code_user")
 
         if "hooks" not in settings:
             settings["hooks"] = {}
@@ -783,9 +782,8 @@ class SetupManager:
         #   2. ~/.config/opencode/evermemos.json  (written by remote_setup.py for Scenario C)
         #   3. Built-in defaults
         # Relevant variables and their defaults:
-        #   EVERMEMOS_BASE_URL  → http://localhost:1995  (preferred)
-        #   API_BASE_URL        → http://localhost:1995  (fallback)
-        #   EVERMEMOS_USER_ID   → opencode_user
+        #   API_BASE_URL        → http://localhost:1995
+        #   MEMORY_USER_ID   → opencode_user
         #   EVERMEMOS_API_KEY   → (empty, required for Scenario B/C auth)
 
         # Register plugin using absolute path (tilde is not always resolved by OpenCode)

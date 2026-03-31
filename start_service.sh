@@ -47,7 +47,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 # ── Remote mode: nothing to start locally ────────────────────────────────────
-REMOTE_URL=$(grep '^EVERMEMOS_REMOTE_URL=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' \r')
+REMOTE_URL=$(grep '^MEMORY_REMOTE_URL=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' \r')
 if [ -n "$REMOTE_URL" ]; then
     echo "ℹ️  Remote mode: local services are not needed."
     echo "   Claude Code is configured to use: $REMOTE_URL"

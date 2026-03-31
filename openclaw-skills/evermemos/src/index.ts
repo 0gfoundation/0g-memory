@@ -32,7 +32,7 @@ interface PluginConfig {
 function resolveConfig(pluginConfig: Record<string, unknown> | undefined): PluginConfig {
   return {
     baseUrl: String(pluginConfig?.apiBaseUrl ?? process.env.API_BASE_URL ?? "http://localhost:1995").replace(/\/$/, ""),
-    userId: String(pluginConfig?.userId ?? process.env.EVERMEMOS_USER_ID ?? "openclaw_user"),
+    userId: String(pluginConfig?.userId ?? process.env.MEMORY_USER_ID ?? "openclaw_user"),
     apiKey: String(pluginConfig?.apiKey ?? process.env.EVERMEMOS_API_KEY ?? ""),
     searchTopK: Number(pluginConfig?.searchTopK ?? 5),
   }

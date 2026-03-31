@@ -271,7 +271,7 @@ Commands:
 
 Environment Variables:
   API_BASE_URL - API base URL (default: http://localhost:1995)
-  EVERMEMOS_USER_ID  - User ID (default: claude_code_user)
+  MEMORY_USER_ID  - User ID (default: claude_code_user)
   EVERMEMOS_GROUP_ID - Override group ID (auto-derived from cwd by default)
 
 Examples:
@@ -284,9 +284,9 @@ Examples:
         sys.exit(1)
 
     # Initialize client, derive group_id from cwd if not explicitly set
-    user_id = os.environ.get("EVERMEMOS_USER_ID", "claude_code_user")
+    user_id = os.environ.get("MEMORY_USER_ID", "claude_code_user")
     client = EverMemOSClient(
-        base_url=os.environ.get("EVERMEMOS_BASE_URL") or os.environ.get("API_BASE_URL", "http://localhost:1995"),
+        base_url=os.environ.get("API_BASE_URL", "http://localhost:1995"),
         user_id=user_id,
         group_id=get_project_group_id(cwd=os.getcwd(), user_id=user_id),
     )
