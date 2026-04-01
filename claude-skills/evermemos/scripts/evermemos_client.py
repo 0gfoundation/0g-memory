@@ -27,7 +27,7 @@ class EverMemOSClient:
     def __init__(
         self,
         base_url: str = "http://localhost:1995",
-        user_id: str = "claude_code_user",
+        user_id: str = "default_user",
         group_id: str = "project_default",
     ):
         self.base_url = base_url.rstrip("/")
@@ -271,7 +271,7 @@ Commands:
 
 Environment Variables:
   API_BASE_URL - API base URL (default: http://localhost:1995)
-  MEMORY_USER_ID  - User ID (default: claude_code_user)
+  MEMORY_USER_ID  - User ID (default: default_user)
   EVERMEMOS_GROUP_ID - Override group ID (auto-derived from cwd by default)
 
 Examples:
@@ -284,7 +284,7 @@ Examples:
         sys.exit(1)
 
     # Initialize client, derive group_id from cwd if not explicitly set
-    user_id = os.environ.get("MEMORY_USER_ID", "claude_code_user")
+    user_id = os.environ.get("MEMORY_USER_ID", "default_user")
     client = EverMemOSClient(
         base_url=os.environ.get("API_BASE_URL", "http://localhost:1995"),
         user_id=user_id,

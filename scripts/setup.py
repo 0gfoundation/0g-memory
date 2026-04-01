@@ -34,6 +34,22 @@ class SetupManager:
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
         self.os_type = platform.system().lower()
 
+    def _read_env_value(self, key: str, default: str = "") -> str:
+        """Read a single key from .env file. Returns default if file or key not found."""
+        env_file = self.project_dir / ".env"
+        if not env_file.exists():
+            return default
+        try:
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    if k.strip() == key:
+                        return v.strip()
+        except OSError:
+            pass
+        return default
+
     def print_header(self, text: str):
         """Print formatted header"""
         print(f"\n{Colors.HEADER}{Colors.BOLD}{'='*60}{Colors.ENDC}")
@@ -641,13 +657,20 @@ class SetupManager:
                 settings = {}
 
         # Ensure env vars are set so hooks know where to reach the backend.
-        # Use setdefault so that remote_setup.py values (written afterwards) are
-        # not overwritten if install_claude_hooks() is called again later.
+        # API_BASE_URL and EVERMEMOS_API_KEY use setdefault so that
+        # remote_setup.py values (written afterwards for Scenario C) are not
+        # overwritten if install_claude_hooks() is called again later.
+        # MEMORY_USER_ID is always synced from .env so re-running install.sh
+        # picks up any change the user made to that value.
         if "env" not in settings:
             settings["env"] = {}
         settings["env"].setdefault("API_BASE_URL", "http://localhost:1995")
         settings["env"].setdefault("EVERMEMOS_API_KEY", "")   # empty = no auth (local mode)
-        settings["env"].setdefault("MEMORY_USER_ID", "claude_code_user")
+        user_id = self._read_env_value("MEMORY_USER_ID") or "default_user"
+        old_uid = settings["env"].get("MEMORY_USER_ID", "")
+        settings["env"]["MEMORY_USER_ID"] = user_id
+        if old_uid and old_uid != user_id:
+            self.print_info(f"Updated MEMORY_USER_ID: {old_uid} → {user_id}")
 
         if "hooks" not in settings:
             settings["hooks"] = {}
@@ -779,12 +802,12 @@ class SetupManager:
 
         # Config priority for the plugin (highest → lowest):
         #   1. Shell environment variables (set in ~/.bashrc or ~/.zshrc)
-        #   2. ~/.config/opencode/evermemos.json  (written by remote_setup.py for Scenario C)
+        #   2. ~/.config/opencode/evermemos.json  (written below for all scenarios)
         #   3. Built-in defaults
         # Relevant variables and their defaults:
-        #   API_BASE_URL        → http://localhost:1995
-        #   MEMORY_USER_ID   → opencode_user
-        #   EVERMEMOS_API_KEY   → (empty, required for Scenario B/C auth)
+        #   baseUrl   → http://localhost:1995  (overwritten by remote_setup.py for Scenario C)
+        #   userId    → MEMORY_USER_ID from .env, or "default_user"
+        #   apiKey    → (empty for local mode; set by remote_setup.py for Scenario C)
 
         # Register plugin using absolute path (tilde is not always resolved by OpenCode)
         plugin_entry = f"file://{Path.home()}/.config/opencode/plugins/evermemos/src/index.ts"
@@ -803,10 +826,36 @@ class SetupManager:
                 json.dump(config, f, indent=2, ensure_ascii=False)
                 f.write("\n")
             self.print_success("Updated ~/.config/opencode/opencode.json")
-            return True
         except OSError as e:
             self.print_error(f"Failed to write opencode.json: {e}")
             return False
+
+        # ── Step 3: Write ~/.config/opencode/evermemos.json (local defaults) ──
+        # The plugin reads this file for userId/baseUrl/apiKey as a fallback to
+        # env vars. remote_setup.py overwrites it for Scenario C; here we set
+        # local-mode defaults so the user doesn't need to touch their shell profile.
+        evermemos_config_path = config_path.parent / "evermemos.json"
+        evermemos_config: dict = {}
+        if evermemos_config_path.exists():
+            try:
+                with open(evermemos_config_path, "r", encoding="utf-8") as f:
+                    evermemos_config = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                evermemos_config = {}
+
+        user_id = self._read_env_value("MEMORY_USER_ID") or "default_user"
+        evermemos_config["baseUrl"] = "http://localhost:1995"  # always reset to local; remote_setup.py overwrites for Scenario C
+        evermemos_config["userId"] = user_id  # always sync with .env
+
+        try:
+            with open(evermemos_config_path, "w", encoding="utf-8") as f:
+                json.dump(evermemos_config, f, indent=2, ensure_ascii=False)
+                f.write("\n")
+            self.print_success(f"Updated ~/.config/opencode/evermemos.json (userId={user_id})")
+        except OSError as e:
+            self.print_warning(f"Failed to write evermemos.json: {e}")
+
+        return True
 
     def is_openclaw_installed(self) -> bool:
         """Check if OpenClaw is installed: binary in PATH or ~/.openclaw/ exists."""
@@ -897,9 +946,10 @@ class SetupManager:
                 config = {}
 
         plugin_id = "evermemos-openclaw"
+        user_id = self._read_env_value("MEMORY_USER_ID") or "default_user"
         plugin_config_block = {
             "apiBaseUrl": "http://localhost:1995",
-            "userId": "openclaw_user",
+            "userId": user_id,
             "searchTopK": 5,
         }
 
@@ -920,6 +970,12 @@ class SetupManager:
                 entry["config"] = plugin_config_block
                 self.print_success(f"Added missing config block to plugins.entries.{plugin_id}")
                 patched = True
+            else:
+                # Always sync userId with .env so re-running install.sh picks up changes
+                if entry["config"].get("userId") != user_id:
+                    entry["config"]["userId"] = user_id
+                    self.print_success(f"Updated plugins.entries.{plugin_id}.config.userId={user_id}")
+                    patched = True
             if not patched:
                 self.print_info(f"plugins.entries.{plugin_id} already configured, skipping")
 
@@ -946,7 +1002,7 @@ class SetupManager:
                 "Please manually add to ~/.openclaw/openclaw.json:\n"
                 f'  "plugins": {{"entries": {{"{plugin_id}": {{"enabled": true, '
                 f'"config": {{"apiBaseUrl": "http://localhost:1995", '
-                f'"userId": "openclaw_user", "searchTopK": 5}}}}}}}}'
+                f'"userId": "default_user", "searchTopK": 5}}}}}}}}'
             )
             return False
 

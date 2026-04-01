@@ -57,24 +57,27 @@ function getConfig() {
       fc.baseUrl ??
       "http://localhost:1995"
     ).replace(/\/$/, ""),
-    userId: process.env.MEMORY_USER_ID ?? fc.userId ?? "opencode_user",
+    userId: process.env.MEMORY_USER_ID ?? fc.userId ?? "default_user",
     apiKey: process.env.EVERMEMOS_API_KEY ?? fc.apiKey ?? "",
   }
 }
 
 /**
- * Derive a unique group_id from the project directory path + userId.
+ * Derive a unique group_id from the project directory path, assistant tag, and userId.
  * Mirrors evermemos_config.py::get_project_group_id() in the Claude Code integration.
+ *
+ * The "opencode" tag ensures memory is isolated from other AI assistants
+ * (Claude Code, OpenClaw) even when they share the same userId and project path.
  *
  * Priority:
  *   1. EVERMEMOS_GROUP_ID env var (explicit override)
- *   2. project_<directory>_<userId>
+ *   2. project_<directory>_opencode_<userId>
  *   3. "project_default" if directory is empty
  */
 function getProjectGroupId(directory: string, userId: string): string {
   const explicit = process.env.EVERMEMOS_GROUP_ID
   if (explicit) return explicit
-  if (directory) return `project_${directory}_${userId}`
+  if (directory) return `project_${directory}_opencode_${userId}`
   return "project_default"
 }
 

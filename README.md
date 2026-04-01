@@ -23,11 +23,51 @@ This is what makes memory truly permanent. The memory system writes every memory
 
 ---
 
+## Choose Your Setup
+
+There are three ways to deploy this project. Read the descriptions below and pick the one that matches your situation — the rest of the documentation uses **Scenario A / B / C** as shorthand for these three modes.
+
+---
+
+**Scenario A — Local (single user)** · *most common*
+
+You run the memory service on your own machine. Only you use it. No authentication, no server management.
+
+> Best for: individual developers who want persistent memory on their local machine.
+>
+> What to do: follow the **Quick Start** below.
+
+---
+
+**Scenario B — Shared server (admin side)**
+
+You host the memory service on a server so that multiple users (your team) can connect to it remotely. You are the administrator — you set it up once, then hand out the server URL.
+
+> Best for: team leads or admins setting up a shared memory backend for others.
+>
+> What to do: follow the **Quick Start** below, then see [Appendix D](#appendix-d-scenario-b--server-deployment-multi-user) for the server-specific steps.
+
+---
+
+**Scenario C — Remote client (user side)**
+
+Someone else has already set up the server (Scenario B). You just connect your AI assistant to it — no local service, no Docker.
+
+> Best for: team members whose admin has already set up the server and given you the URL.
+>
+> What to do: skip directly to [Appendix E](#appendix-e-scenario-c--remote-client-setup). You do not need to follow the Quick Start.
+
+---
+
+> **Scenario B and C are two sides of the same deployment** — B is what the server admin does, C is what each connecting user does. If your admin tells you "here is the server URL", you are Scenario C.
+
+---
+
 ## Quick Start
 
-> **Running your own local instance (Scenario A)?** Follow the steps below.
-> **Hosting a shared server for multiple users (Scenario B)?** Follow the steps below, then see [Appendix D](#appendix-d-scenario-b--server-deployment-multi-user) for the additional server-side setup.
-> **Connecting to a remote EverMemOS server (Scenario C)?** Skip to [Appendix E](#appendix-e-scenario-c--remote-client-setup).
+> **Scenario A?** Follow the steps below.
+> **Scenario B?** Follow the steps below, then see [Appendix D](#appendix-d-scenario-b--server-deployment-multi-user) for the additional server-side setup.
+> **Scenario C?** Skip to [Appendix E](#appendix-e-scenario-c--remote-client-setup) — you do not need this section.
 
 ### Prerequisites
 
@@ -61,6 +101,7 @@ LLM_API_KEY=...           # any OpenAI-compatible provider (OpenRouter, DeepSeek
 VECTORIZE_API_KEY=...     # embedding service key — if using OpenAI (default), same as LLM_API_KEY
 RERANK_API_KEY=...        # rerank service key — requires a rerank-capable provider (default: DeepInfra)
 ZEROG_WALLET_KEY=...      # EVM wallet private key funded with 0G testnet tokens (see Appendix C)
+MEMORY_USER_ID=alice      # optional — your name in memory records; leave blank to use the default "default_user"
 ```
 
 > **Note on `RERANK_API_KEY`:** OpenAI does not provide a reranking API. The default rerank provider is **[DeepInfra](https://deepinfra.com)** — sign up, copy your API key, and paste it here. The default model is `Qwen/Qwen3-Reranker-4B`. `RERANK_BASE_URL` and `RERANK_MODEL` in `.env` let you point to any compatible rerank endpoint (e.g. a self-hosted vLLM instance).
@@ -461,6 +502,8 @@ SERVER_MODE=true
 ```
 
 Fill in the three required keys (`LLM_API_KEY`, `VECTORIZE_API_KEY`, `RERANK_API_KEY`).
+
+> **`MEMORY_USER_ID` is not relevant for the server itself.** It only takes effect if you also run Claude Code, OpenCode, or OpenClaw on the server machine and want to use memory locally — see Step 4 below. You can leave it blank.
 
 > **`ZEROG_WALLET_KEY` is not required in Scenario B.** In server mode, each user supplies their own wallet key at registration — the server uses that key to write to 0G storage on their behalf. The server itself does not need a wallet key.
 

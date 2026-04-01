@@ -32,7 +32,7 @@ interface PluginConfig {
 function resolveConfig(pluginConfig: Record<string, unknown> | undefined): PluginConfig {
   return {
     baseUrl: String(pluginConfig?.apiBaseUrl ?? process.env.API_BASE_URL ?? "http://localhost:1995").replace(/\/$/, ""),
-    userId: String(pluginConfig?.userId ?? process.env.MEMORY_USER_ID ?? "openclaw_user"),
+    userId: String(pluginConfig?.userId ?? process.env.MEMORY_USER_ID ?? "default_user"),
     apiKey: String(pluginConfig?.apiKey ?? process.env.EVERMEMOS_API_KEY ?? ""),
     searchTopK: Number(pluginConfig?.searchTopK ?? 5),
   }
@@ -46,12 +46,15 @@ function authHeaders(apiKey: string): Record<string, string> {
 /**
  * Derive a unique group_id for EverMemOS namespace isolation.
  *
+ * The "openclaw" tag ensures memory is isolated from other AI assistants
+ * (Claude Code, OpenCode) even when they share the same userId and project path.
+ *
  * Priority:
  *   1. EVERMEMOS_GROUP_ID env var (explicit override)
- *   2. session_<sessionKey>_<userId>   (e.g. "main", "tui-xxx") — preferred
- *   3. project_<workspaceDir>_<userId> (fallback when sessionKey unavailable)
- *   4. channel_<channelId>_<userId>    (fallback when workspaceDir also unavailable)
- *   5. project_openclaw_<userId>       (last resort)
+ *   2. session_<sessionKey>_openclaw_<userId>   (e.g. "main", "tui-xxx") — preferred
+ *   3. project_<workspaceDir>_openclaw_<userId> (fallback when sessionKey unavailable)
+ *   4. channel_<channelId>_openclaw_<userId>    (fallback when workspaceDir also unavailable)
+ *   5. project_openclaw_<userId>                (last resort)
  *
  * sessionKey is the preferred identifier because OpenClaw sessions all share the
  * same default workspaceDir, making it a poor isolation key.  workspaceDir and
@@ -65,9 +68,9 @@ function deriveGroupId(opts: {
 }): string {
   const explicit = process.env.EVERMEMOS_GROUP_ID
   if (explicit) return explicit
-  if (opts.sessionKey) return `session_${opts.sessionKey}_${opts.userId}`
-  if (opts.workspaceDir) return `project_${opts.workspaceDir}_${opts.userId}`
-  if (opts.channelId) return `channel_${opts.channelId}_${opts.userId}`
+  if (opts.sessionKey) return `session_${opts.sessionKey}_openclaw_${opts.userId}`
+  if (opts.workspaceDir) return `project_${opts.workspaceDir}_openclaw_${opts.userId}`
+  if (opts.channelId) return `channel_${opts.channelId}_openclaw_${opts.userId}`
   return `project_openclaw_${opts.userId}`
 }
 
