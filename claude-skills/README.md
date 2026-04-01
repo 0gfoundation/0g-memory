@@ -22,7 +22,7 @@ cp -r claude-skills/evermemos ~/.claude/skills/
 
 ```bash
 export API_BASE_URL="http://localhost:1995"
-export EVERMEMOS_USER_ID="your_username"
+export MEMORY_USER_ID="your_username"
 ```
 
 ## 卸载

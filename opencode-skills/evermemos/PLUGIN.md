@@ -24,15 +24,14 @@ Works out of the box with no configuration. The plugin connects to `http://local
 
 ### Remote server mode (Scenario B / C)
 
-Run `./install.sh` with `EVERMEMOS_REMOTE_URL` set in `.env` — credentials are configured automatically.
+Run `./install.sh` with `MEMORY_REMOTE_URL` set in `.env` — credentials are configured automatically.
 
 To override manually, set these environment variables in your shell profile (`~/.bashrc` or `~/.zshrc`):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `EVERMEMOS_BASE_URL` | `http://localhost:1995` | EverMemOS backend URL (preferred) |
-| `API_BASE_URL` | `http://localhost:1995` | EverMemOS backend URL (fallback) |
-| `EVERMEMOS_USER_ID` | `opencode_user` | Your user identity |
+| `API_BASE_URL` | `http://localhost:1995` | EverMemOS backend URL |
+| `MEMORY_USER_ID` | `opencode_user` | Your user identity |
 | `EVERMEMOS_API_KEY` | _(empty)_ | API key for authenticated servers (Scenario B/C) |
 | `EVERMEMOS_GROUP_ID` | _(auto-derived)_ | Project group ID — auto-derived from project path if not set |
 

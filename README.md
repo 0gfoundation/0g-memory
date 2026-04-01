@@ -23,7 +23,51 @@ This is what makes memory truly permanent. The memory system writes every memory
 
 ---
 
+## Choose Your Setup
+
+There are three ways to deploy this project. Read the descriptions below and pick the one that matches your situation — the rest of the documentation uses **Scenario A / B / C** as shorthand for these three modes.
+
+---
+
+**Scenario A — Local (single user)** · *most common*
+
+You run the memory service on your own machine. Only you use it. No authentication, no server management.
+
+> Best for: individual developers who want persistent memory on their local machine.
+>
+> What to do: follow the **Quick Start** below.
+
+---
+
+**Scenario B — Shared server (admin side)**
+
+You host the memory service on a server so that multiple users (your team) can connect to it remotely. You are the administrator — you set it up once, then hand out the server URL.
+
+> Best for: team leads or admins setting up a shared memory backend for others.
+>
+> What to do: follow the **Quick Start** below, then see [Appendix D](#appendix-d-scenario-b--server-deployment-multi-user) for the server-specific steps.
+
+---
+
+**Scenario C — Remote client (user side)**
+
+Someone else has already set up the server (Scenario B). You just connect your AI assistant to it — no local service, no Docker.
+
+> Best for: team members whose admin has already set up the server and given you the URL.
+>
+> What to do: skip directly to [Appendix E](#appendix-e-scenario-c--remote-client-setup). You do not need to follow the Quick Start.
+
+---
+
+> **Scenario B and C are two sides of the same deployment** — B is what the server admin does, C is what each connecting user does. If your admin tells you "here is the server URL", you are Scenario C.
+
+---
+
 ## Quick Start
+
+> **Scenario A?** Follow the steps below.
+> **Scenario B?** Follow the steps below, then see [Appendix D](#appendix-d-scenario-b--server-deployment-multi-user) for the additional server-side setup.
+> **Scenario C?** Skip to [Appendix E](#appendix-e-scenario-c--remote-client-setup) — you do not need this section.
 
 ### Prerequisites
 
@@ -35,32 +79,40 @@ This is what makes memory truly permanent. The memory system writes every memory
 | [Homebrew](https://brew.sh) | — | [Appendix A](#appendix-a-installing-homebrew-on-macos) |
 | Docker 20.10+ | auto-installed if missing | [Appendix B](#appendix-b-installing-docker-on-macos) |
 | [uv](https://astral.sh/uv/) | auto-installed if missing | auto-installed via brew if missing |
+| 0G testnet wallet ² | [Appendix C](#appendix-c-getting-your-zerog_wallet_key) | [Appendix C](#appendix-c-getting-your-zerog_wallet_key) |
 | RAM / Disk | 4 GB RAM, 10 GB free disk | 4 GB RAM, 10 GB free disk |
 
 > ¹ Python 3.8+ is required only to run the installer. The application itself requires Python 3.12, which **uv downloads and manages automatically** — you do not need to install 3.12 yourself.
+>
+> ² Getting testnet tokens requires emailing the 0G admin and may take **hours to 1–2 days**. **Start this first** before proceeding — see [Appendix C](#appendix-c-getting-your-zerog_wallet_key) for step-by-step instructions. You can complete the rest of the setup while you wait.
 
-### 1. Install
+### 1. Configure
 
 ```bash
 git clone https://github.com/0gfoundation/0g-memory.git
 cd 0g-memory
-./install.sh
+cp env.template.0g.example .env
 ```
 
-### 2. Configure
-
-`install.sh` creates a `.env` file from the template. Open it and fill in your API keys:
+Open `.env` and fill in your API keys:
 
 ```bash
 LLM_API_KEY=...           # any OpenAI-compatible provider (OpenRouter, DeepSeek, xAI, etc.)
 VECTORIZE_API_KEY=...     # embedding service key — if using OpenAI (default), same as LLM_API_KEY
 RERANK_API_KEY=...        # rerank service key — requires a rerank-capable provider (default: DeepInfra)
 ZEROG_WALLET_KEY=...      # EVM wallet private key funded with 0G testnet tokens (see Appendix C)
+MEMORY_USER_ID=alice      # optional — your name in memory records; leave blank to use the default "default_user"
 ```
 
 > **Note on `RERANK_API_KEY`:** OpenAI does not provide a reranking API. The default rerank provider is **[DeepInfra](https://deepinfra.com)** — sign up, copy your API key, and paste it here. The default model is `Qwen/Qwen3-Reranker-4B`. `RERANK_BASE_URL` and `RERANK_MODEL` in `.env` let you point to any compatible rerank endpoint (e.g. a self-hosted vLLM instance).
 
 > `LLM_BASE_URL` and `LLM_MODEL` in `.env` let you point to any OpenAI-compatible endpoint. The defaults use **OpenAI directly** (`gpt-4o-mini`). To switch to [OpenRouter](https://openrouter.ai) or another provider, update `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY` accordingly.
+
+### 2. Install
+
+```bash
+./install.sh
+```
 
 ### 3. Start
 
@@ -174,8 +226,8 @@ When you come back and want to resume:
 ### Typical workflow
 
 ```
-install.sh
-  └─ fill in .env
+fill in .env
+  └─ install.sh
        └─ start_service.sh                        ← first time (fresh stream)
             └─ use your AI coding assistant normally
                  └─ stop_service.sh               ← data preserved
@@ -257,6 +309,8 @@ When you stop and restart EverMemOS, the kv-server needs to re-sync your existin
 
 ### Verify everything is running
 
+> **Note:** this section applies to Scenario A/B (local service) only. Scenario C users have no local service to check — if memory is not working, confirm your `.evermemos_remote_secrets` file exists and re-run `./install.sh`.
+
 Run these from the `0g-memory` project directory:
 
 ```bash
@@ -276,6 +330,8 @@ pgrep -a zgs_kv
 ```
 
 ### Logs
+
+> **Note:** this section applies to Scenario A/B (local service) only.
 
 All log commands below must be run from the `0g-memory` project directory.
 
@@ -419,3 +475,160 @@ ZEROG_WALLET_KEY=<your 64-character hex private key here>
 ```
 
 > ⚠️ **Security reminder:** never share your private key, never commit it to version control. Anyone with this key has full control of the wallet.
+
+### Appendix D: Scenario B — Server Deployment (Multi-User)
+
+Use this appendix if you want to host a shared EverMemOS server that multiple users can connect to. Users connect from their own machines using Scenario C ([Appendix E](#appendix-e-scenario-c--remote-client-setup)) — they do not run any local Docker services themselves.
+
+#### Who this is for
+
+Scenario B is for administrators who want to:
+- Host a centralized memory server for a team
+- Let users connect with just a server URL and username (no local Docker setup on each machine)
+- Manage the LLM, embedding, and rerank backends centrally
+
+#### How it differs from Scenario A
+
+One setting change: set `SERVER_MODE=true` in `.env`. Everything else — configure, install, start — is identical to Scenario A. When `SERVER_MODE=true`, the backend enforces Bearer API key authentication on all memory endpoints. Each user gets their own isolated memory namespace.
+
+#### Step 1 — Follow the standard Quick Start
+
+Complete **Quick Start steps 1–3** (Configure, Install, Start) with one additional change in step 1:
+
+Open `.env` and set:
+
+```bash
+SERVER_MODE=true
+```
+
+Fill in the three required keys (`LLM_API_KEY`, `VECTORIZE_API_KEY`, `RERANK_API_KEY`).
+
+> **`MEMORY_USER_ID` is not relevant for the server itself.** It only takes effect if you also run Claude Code, OpenCode, or OpenClaw on the server machine and want to use memory locally — see Step 4 below. You can leave it blank.
+
+> **`ZEROG_WALLET_KEY` is not required in Scenario B.** In server mode, each user supplies their own wallet key at registration — the server uses that key to write to 0G storage on their behalf. The server itself does not need a wallet key.
+
+#### Step 2 — Expose the server
+
+Make port `1995` reachable by your users:
+
+- **Firewall / security group:** open TCP port `1995` (or whichever port you expose)
+- **Reverse proxy (recommended for production):** put nginx or Caddy in front with HTTPS
+
+Share the server URL with your users (e.g. `http://your-server-ip:1995` or `https://memory.your-domain.com`).
+
+#### Step 3 — Users register and connect
+
+Each user runs `./install.sh` on their own machine with `MEMORY_REMOTE_URL` set to your server URL. The installer registers them automatically and configures their AI assistant. See [Appendix E](#appendix-e-scenario-c--remote-client-setup).
+
+Each user needs their own EVM wallet (`ZEROG_WALLET_KEY`) — the server stores it to write their encrypted memories to the 0G network on their behalf.
+
+#### Step 4 — Register yourself (optional, on the server machine)
+
+If you also want to use memory from the server machine itself, register your own account manually:
+
+```bash
+curl -X POST http://localhost:1995/api/v1/users/register \
+     -H 'Content-Type: application/json' \
+     -d '{"user_id": "your_id", "zerog_wallet_key": "your_wallet_key"}'
+```
+
+The response contains your `api_key` — **it is shown only once, store it immediately**:
+
+```json
+{
+  "user_id": "your_id",
+  "api_key": "...",
+  "message": "Registration successful. Store your api_key securely — it will not be shown again."
+}
+```
+
+Then configure your AI assistant with the returned credentials:
+
+- **Claude Code** — update these values in `~/.claude/settings.json` (env section):
+  ```
+  "EVERMEMOS_API_KEY": "<api_key>"
+  "MEMORY_USER_ID": "<your_id>"
+  ```
+  (both keys already exist from `install.sh` — replace the placeholder values)
+
+- **OpenCode** — create/update `~/.config/opencode/evermemos.json`:
+  ```json
+  {"baseUrl": "http://localhost:1995", "userId": "<your_id>", "apiKey": "<api_key>"}
+  ```
+
+- **OpenClaw** — update `plugins.entries.evermemos-openclaw.config` in `~/.openclaw/openclaw.json`:
+  ```
+  "apiBaseUrl": "http://localhost:1995", "userId": "<your_id>", "apiKey": "<api_key>"
+  ```
+  Then run `openclaw gateway restart`.
+
+### Appendix E: Scenario C — Remote Client Setup
+
+Use this appendix if someone else is hosting an EverMemOS server and you want to connect your AI coding assistant (Claude Code, OpenCode, or OpenClaw) to it — without running any local services yourself.
+
+#### Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| Claude Code, OpenCode, and/or OpenClaw | at least one must be installed |
+| Python 3.8+ | typically pre-installed |
+| Remote server URL | provided by the server administrator |
+| `ZEROG_WALLET_KEY` | see [Appendix C](#appendix-c-getting-your-zerog_wallet_key) — your key is sent to the server at registration and used to write your memories to the 0G network on your behalf |
+
+> **Note on `ZEROG_WALLET_KEY`:** even though you are not running a local service, your wallet key is required. The remote server stores it and uses it to write your encrypted memories to the 0G decentralized network — each user owns their own private 0G stream.
+
+#### Step 1 — Clone the repository
+
+```bash
+git clone https://github.com/0gfoundation/0g-memory.git
+cd 0g-memory
+```
+
+#### Step 2 — Edit `.env`
+
+Copy the template and fill in three values:
+
+```bash
+cp env.template.0g.example .env
+```
+
+Open `.env` and set:
+
+```bash
+MEMORY_REMOTE_URL=http://<server-ip>:<port>    # provided by the server admin
+MEMORY_USER_ID=<your-chosen-username>           # must be unique on that server
+ZEROG_WALLET_KEY=<your-64-char-hex-private-key>   # see Appendix C
+```
+
+Leave everything else at defaults.
+
+#### Step 3 — Run the installer
+
+```bash
+./install.sh
+```
+
+Because `MEMORY_REMOTE_URL` is set, `install.sh` automatically:
+
+1. Installs the AI assistant integration only (no Docker, no local service needed)
+2. Registers your username on the remote server and receives an API key
+3. Stores credentials in `.evermemos_remote_secrets`
+4. Configures your AI assistant to use the remote server and authenticate with the API key:
+   - **Claude Code** — updates `~/.claude/settings.json` with `API_BASE_URL`, `MEMORY_USER_ID`, and `EVERMEMOS_API_KEY`
+   - **OpenCode** — writes `~/.config/opencode/evermemos.json` with `baseUrl`, `userId`, and `apiKey`
+   - **OpenClaw** — updates `~/.openclaw/openclaw.json` with `apiBaseUrl`, `userId`, and `apiKey`
+
+**OpenClaw only:** run `openclaw gateway restart` after the installer finishes to activate the plugin.
+
+#### Step 4 — Verify
+
+Start your AI coding assistant. Follow the same [2-minute test](#4-verify-memory-works--a-2-minute-test) from the Quick Start to confirm memory is working.
+
+- **Claude Code / OpenCode:** follow the "Claude Code / OpenCode" instructions in Step B (type `/exit`, reopen, ask questions).
+- **OpenClaw:** follow the "OpenClaw" instructions in Step B (verify within the same session).
+
+#### Notes
+
+- You do **not** need to run `./start_service.sh` — there is no local service to start.
+- To uninstall, run `./uninstall.sh`. This removes the local integration and credentials but does **not** delete your memories from the remote server.
+- If registration fails with "user already exists", contact the server admin to reset your API key, or manually create `.evermemos_remote_secrets` with your credentials.
