@@ -51,13 +51,6 @@ class KVStorageLifespan(LifespanProvider):
 
         try:
             if kv_type == "zerog":
-                logger.info("🚀 Initializing 0G-Storage KV-Storage...")
-
-                # Import here to avoid circular dependency
-                from infra_layer.adapters.out.persistence.kv_storage.zerog_kv_storage import (
-                    ZeroGKVStorage,
-                )
-
                 # Read configuration from environment variables
                 kv_url = os.getenv("ZEROG_READ_NODE")
                 rpc_url = os.getenv("ZEROG_RPC_URL")
@@ -81,21 +74,46 @@ class KVStorageLifespan(LifespanProvider):
                         f"Please set these environment variables or check .env file."
                     )
 
-                # Create ZeroGKVStorage instance
-                # Note: ZEROG_WALLET_KEY, ZEROG_STREAM_ID, ZEROG_ENCRYPTION_KEY
-                #       are all read/generated inside ZeroGKVStorage.__init__
-                kv_storage = ZeroGKVStorage(
-                    kv_url=kv_url,
-                    rpc_url=rpc_url,
-                    indexer_url=indexer_url,
-                    flow_address=flow_address,
-                )
+                # Server mode: multi-user, use UserAwareKVStorageProxy.
+                # Local mode: single user, use ZeroGKVStorage directly (loads .0g_secrets).
+                server_mode = os.getenv("SERVER_MODE", "false").lower() == "true"
 
-                logger.info(
-                    f"✅ 0G-Storage KV-Storage initialized successfully\n"
-                    f"   KV URL: {kv_url}\n"
-                    f"   Indexer URL: {indexer_url}"
-                )
+                if server_mode:
+                    logger.info("🚀 Initializing 0G-Storage KV-Storage (server/multi-user mode)...")
+                    from infra_layer.adapters.out.persistence.kv_storage.user_aware_kv_storage import (
+                        UserAwareKVStorageProxy,
+                    )
+
+                    kv_storage = UserAwareKVStorageProxy(
+                        kv_url=kv_url,
+                        rpc_url=rpc_url,
+                        indexer_url=indexer_url,
+                        flow_address=flow_address,
+                    )
+                    logger.info(
+                        f"✅ UserAwareKVStorageProxy initialized\n"
+                        f"   KV URL: {kv_url}\n"
+                        f"   Indexer URL: {indexer_url}"
+                    )
+                else:
+                    logger.info("🚀 Initializing 0G-Storage KV-Storage (local/single-user mode)...")
+                    from infra_layer.adapters.out.persistence.kv_storage.zerog_kv_storage import (
+                        ZeroGKVStorage,
+                    )
+
+                    # ZEROG_WALLET_KEY, ZEROG_STREAM_ID, ZEROG_ENCRYPTION_KEY
+                    # are read/generated inside ZeroGKVStorage.__init__ from .0g_secrets
+                    kv_storage = ZeroGKVStorage(
+                        kv_url=kv_url,
+                        rpc_url=rpc_url,
+                        indexer_url=indexer_url,
+                        flow_address=flow_address,
+                    )
+                    logger.info(
+                        f"✅ 0G-Storage KV-Storage initialized successfully\n"
+                        f"   KV URL: {kv_url}\n"
+                        f"   Indexer URL: {indexer_url}"
+                    )
 
             elif kv_type == "redis":
                 logger.info("🚀 Initializing Redis KV-Storage...")

@@ -148,7 +148,7 @@ for event in list(hooks.keys()):
         del hooks[event]
 
 # Remove EverMemOS env vars
-evermemos_env_keys = {"API_BASE_URL", "EVERMEMOS_USER_ID", "EVERMEMOS_GROUP_ID"}
+evermemos_env_keys = {"API_BASE_URL", "EVERMEMOS_BASE_URL", "EVERMEMOS_API_KEY", "EVERMEMOS_USER_ID", "EVERMEMOS_GROUP_ID"}
 env = settings.get("env", {})
 removed_env = [k for k in evermemos_env_keys if k in env]
 for k in removed_env:
@@ -177,6 +177,15 @@ if [ -d "$OPENCODE_PLUGIN_DIR" ]; then
     echo "  ✅ Deleted $OPENCODE_PLUGIN_DIR"
 else
     echo "  ℹ️  $OPENCODE_PLUGIN_DIR not found, skipping"
+fi
+
+# Remove remote config file written by remote_setup.py
+OPENCODE_EVERMEMOS_CONFIG="$HOME/.config/opencode/evermemos.json"
+if [ -f "$OPENCODE_EVERMEMOS_CONFIG" ]; then
+    rm -f "$OPENCODE_EVERMEMOS_CONFIG"
+    echo "  ✅ Deleted $OPENCODE_EVERMEMOS_CONFIG"
+else
+    echo "  ℹ️  $OPENCODE_EVERMEMOS_CONFIG not found, skipping"
 fi
 
 # Remove plugin entry from ~/.config/opencode/opencode.json

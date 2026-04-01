@@ -46,6 +46,15 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
+# ── Remote mode: nothing to start locally ────────────────────────────────────
+REMOTE_URL=$(grep '^EVERMEMOS_REMOTE_URL=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' \r')
+if [ -n "$REMOTE_URL" ]; then
+    echo "ℹ️  Remote mode: local services are not needed."
+    echo "   Claude Code is configured to use: $REMOTE_URL"
+    echo "   To reconfigure, edit .env and re-run ./install.sh"
+    exit 0
+fi
+
 WALLET_KEY=$(grep '^ZEROG_WALLET_KEY=' "$ENV_FILE" | cut -d'=' -f2 | tr -d ' \r')
 if [ -z "$WALLET_KEY" ] || ! echo "$WALLET_KEY" | grep -qE '^[0-9a-fA-F]{64}$'; then
     echo "❌ ZEROG_WALLET_KEY in .env is missing or invalid."

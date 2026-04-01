@@ -116,20 +116,29 @@ class ZeroGKVStorage(KVStorageInterface):
 
     def __init__(
         self,
-        kv_url: str,                    # KV node URL for reads/writes
-        rpc_url: str,                   # "https://evmrpc-testnet.0g.ai"
-        indexer_url: str,               # Indexer URL for uploads
-        flow_address: str,              # Flow contract address
-        max_queue_size: int = 100,      # Internal write queue size
-        max_cache_entries: int = 10000, # Local read cache size
+        kv_url: str,                                # KV node URL for reads/writes
+        rpc_url: str,                               # "https://evmrpc-testnet.0g.ai"
+        indexer_url: str,                           # Indexer URL for uploads
+        flow_address: str,                          # Flow contract address
+        max_queue_size: int = 100,                  # Internal write queue size
+        max_cache_entries: int = 10000,             # Local read cache size
+        stream_id: Optional[str] = None,            # Per-user stream ID (server mode)
+        encryption_key: Optional[bytes] = None,    # Per-user AES key (server mode)
+        wallet_private_key: Optional[str] = None,  # Per-user wallet key (server mode)
     ):
-        # Load or generate stream_id and encryption_key from .0g_secrets
-        stream_id, encryption_key = _load_or_generate_secrets()
+        # Server mode: params passed in directly.
+        # Local mode: load from .0g_secrets + ZEROG_WALLET_KEY env var.
+        if stream_id is None or encryption_key is None:
+            stream_id, encryption_key = _load_or_generate_secrets()
         self.stream_id = stream_id
 
-        wallet_private_key = os.getenv('ZEROG_WALLET_KEY')
         if not wallet_private_key:
-            raise ValueError("ZEROG_WALLET_KEY environment variable is required")
+            wallet_private_key = os.getenv('ZEROG_WALLET_KEY')
+        if not wallet_private_key:
+            raise ValueError(
+                "wallet_private_key must be provided (server mode) "
+                "or ZEROG_WALLET_KEY env var must be set (local mode)"
+            )
 
         evm = EvmClient(
             rpc_url=rpc_url,
