@@ -56,11 +56,50 @@ fi
 PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 echo "✅ Python $PYTHON_VERSION (uv will manage Python 3.12 for the application)"
 
+# ── Early: create .env from template if it doesn't exist ─────────────────────
+# Must happen in bash BEFORE any Python scripts run, so that EVERMEMOS_REMOTE_URL
+# can be read for remote-mode detection below.
+ENV_FILE="$SCRIPT_DIR/.env"
+TEMPLATE_FILE="$SCRIPT_DIR/env.template.0g.example"
+if [ ! -f "$ENV_FILE" ]; then
+    if [ -f "$TEMPLATE_FILE" ]; then
+        cp "$TEMPLATE_FILE" "$ENV_FILE"
+        echo "  📋 Created .env from env.template.0g.example"
+        echo "  ⚠️  Please edit .env and fill in your private keys and API keys"
+    else
+        echo "  ⚠️  env.template.0g.example not found — please create .env manually"
+    fi
+fi
+
+# ── Remote mode detection (must be BEFORE setup.py, which requires Docker) ───
+REMOTE_URL=$(grep '^EVERMEMOS_REMOTE_URL=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' \r')
+if [ -n "$REMOTE_URL" ]; then
+    echo ""
+    echo "▶  Remote mode detected (EVERMEMOS_REMOTE_URL=$REMOTE_URL)"
+    echo "   Installing editor integrations only (no Docker required)..."
+    echo ""
+    python3 scripts/setup.py --hooks-only
+    echo ""
+    echo "▶  Registering with remote server and configuring Claude Code..."
+    echo ""
+    python3 scripts/remote_setup.py
+    echo ""
+    echo "============================================================"
+    echo "  ✅ Remote setup complete!"
+    echo ""
+    echo "  Claude Code will now use the remote EverMemOS server."
+    echo "  Credentials stored in: .evermemos_remote_secrets"
+    echo "  No local service needs to be started."
+    echo "============================================================"
+    echo ""
+    exit 0
+fi
+
 # ── Step 1-5: Setup (via setup.py) ──────────────────────────────────────────
 #   1. Checks Python version (3.12 required)
 #   2. Checks / auto-installs uv package manager
 #   3. Installs Python dependencies (uv sync)
-#   4. Verifies Docker is installed, creates .env from template
+#   4. Verifies Docker is installed (.env already exists from above if created)
 #   5. Installs Claude Code / OpenCode / OpenClaw integrations (if installed)
 echo ""
 echo "▶  Running setup..."
@@ -210,5 +249,26 @@ echo ""
 echo "  ℹ️  If Claude Code, OpenCode, or OpenClaw integrations were installed above,"
 echo "     restart those tools so the newly added hooks/plugins take effect."
 echo "     For OpenClaw: openclaw gateway restart"
+echo ""
+# In server mode, the admin needs to register themselves to use Claude Code memory locally.
+SERVER_MODE_VAL=$(grep '^SERVER_MODE=' "$SCRIPT_DIR/.env" 2>/dev/null | cut -d'=' -f2 | tr -d ' \r')
+if [ "$SERVER_MODE_VAL" = "true" ]; then
+echo "  ℹ️  SERVER_MODE=true: to use memory on this machine (optional),"
+echo "     register yourself after starting the service:"
+echo "       curl -X POST http://localhost:1995/api/v1/users/register \\"
+echo "            -H 'Content-Type: application/json' \\"
+echo "            -d '{\"user_id\": \"your_id\", \"zerog_wallet_key\": \"your_wallet_key\"}'"
+echo "     Then configure each AI assistant you use with the returned api_key:"
+echo ""
+echo "     Claude Code — add to ~/.claude/settings.json (env section):"
+echo "       \"EVERMEMOS_API_KEY\": \"<api_key>\""
+echo "       \"EVERMEMOS_USER_ID\": \"<your_id>\""
+echo ""
+echo "     OpenCode — create/update ~/.config/opencode/evermemos.json:"
+echo "       {\"baseUrl\": \"http://localhost:1995\", \"userId\": \"<your_id>\", \"apiKey\": \"<api_key>\"}"
+echo ""
+echo "     OpenClaw — update plugins.entries.evermemos-openclaw.config in ~/.openclaw/openclaw.json:"
+echo "       \"apiBaseUrl\": \"http://localhost:1995\", \"userId\": \"<your_id>\", \"apiKey\": \"<api_key>\""
+fi
 echo "============================================================"
 echo ""

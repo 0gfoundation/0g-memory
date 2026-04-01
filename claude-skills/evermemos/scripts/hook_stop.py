@@ -32,7 +32,7 @@ logger = get_logger("hook_stop")
 def _is_service_available():
     base_url = os.environ.get('API_BASE_URL', 'http://localhost:1995')
     try:
-        urllib.request.urlopen(f"{base_url}/health", timeout=1)
+        urllib.request.urlopen(f"{base_url}/health", timeout=10)
         return True
     except Exception:
         return False
