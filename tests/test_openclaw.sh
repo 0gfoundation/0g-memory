@@ -4,7 +4,7 @@
 # 用法：
 #   bash tests/test_openclaw.sh          # 运行所有三个检查
 #   bash tests/test_openclaw.sh search   # 只看 query + search 结果
-#   bash tests/test_openclaw.sh inject   # 只看注入内容（需重启 gateway 后生效）
+#   bash tests/test_openclaw.sh inject   # 只看注入内容
 #   bash tests/test_openclaw.sh store    # 只看存入 EverMemOS 的内容
 
 LOG=/tmp/evermemos_openclaw.log
@@ -20,11 +20,11 @@ import json, urllib.request, urllib.parse
 from pathlib import Path
 
 BASE_URL = "http://localhost:1995"
-USER_ID  = "openclaw_user"
 LOG      = "/tmp/evermemos_openclaw.log"
 
-# 从日志中动态提取实际使用的 group_id
-def detect_group_id():
+# 从日志中动态提取实际使用的 group_id，并从中解析 user_id。
+# groupId 格式为 "..._openclaw_{userId}"，拆分 "_openclaw_" 取最后一段即可。
+def detect_ids():
     for line in Path(LOG).read_text().splitlines():
         try:
             d = json.loads(line)
@@ -34,11 +34,12 @@ def detect_group_id():
         if not isinstance(data, dict):
             continue
         g = data.get("groupId", "")
-        if g:
-            return g
-    return ""
+        if g and "_openclaw_" in g:
+            u = g.split("_openclaw_", 1)[1]
+            return u, g
+    return "default_user", ""
 
-GROUP_ID = detect_group_id()
+USER_ID, GROUP_ID = detect_ids()
 
 def search_api(query, top_k=5):
     params = urllib.parse.urlencode({
@@ -119,7 +120,7 @@ EOF
 run_inject() {
     echo ""
     echo "$SEP"
-    echo "  1. 注入内容（injected_text 需重启 gateway 后生效）"
+    echo "  1. 注入内容"
     echo "$SEP"
     grep '"Injection summary"' "$LOG" | python3 -c "
 import sys, json
@@ -131,8 +132,12 @@ for line in sys.stdin:
     print(f\"[{ts}] qry_ok={data.get('query_injected')}\")
     if text:
         print(text)
+    elif 'query_injected' in data:
+        # 当前日志格式：插件正常运行，只是搜索结果为空
+        print('  (no results — 暂无相关 memories，无需重启)')
     else:
-        print('  (injected_text 不在日志中，请重启 gateway 后生效)')
+        # 旧日志格式：injected_text 字段不存在，需重启 gateway 生成新日志
+        print('  (旧日志格式，请重启 gateway 后生效)')
     print('─' * 70)
 "
 }
