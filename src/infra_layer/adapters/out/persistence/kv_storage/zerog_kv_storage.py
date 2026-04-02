@@ -40,6 +40,7 @@ from zg_storage import CachedKvClient, EvmClient, UploadOption
 logger = get_logger(__name__)
 
 COMMIT_INTERVAL = 20  # seconds between commit attempts
+MAX_COMMIT_FAILURES = 3  # consecutive failures before attempting client recreation
 
 _SECRETS_FILE = ".0g_secrets"
 
@@ -131,6 +132,16 @@ class ZeroGKVStorage(KVStorageInterface):
         if not wallet_private_key:
             raise ValueError("ZEROG_WALLET_KEY environment variable is required")
 
+        # Save params needed to recreate the client after failure
+        self._kv_url = kv_url
+        self._rpc_url = rpc_url
+        self._indexer_url = indexer_url
+        self._flow_address = flow_address
+        self._max_queue_size = max_queue_size
+        self._max_cache_entries = max_cache_entries
+        self._wallet_private_key = wallet_private_key
+        self._encryption_key = encryption_key
+
         evm = EvmClient(
             rpc_url=rpc_url,
             private_key=wallet_private_key,
@@ -146,6 +157,9 @@ class ZeroGKVStorage(KVStorageInterface):
             upload_option=UploadOption(skip_tx=False),
             encryption_key=encryption_key,
         )
+
+        # Protects _cached during client recreation
+        self._client_lock = threading.RLock()
 
         # Atomic counter: ops staged since the last commit.
         self._pending_count = _AtomicInt()
@@ -181,24 +195,74 @@ class ZeroGKVStorage(KVStorageInterface):
     # Internal: time-based commit loop
     # -------------------------------------------------------------------------
 
+    def _recreate_client(self) -> None:
+        """
+        Recreate CachedKvClient after a fatal failure (e.g. SSL error leaving
+        the client in a permanent failed state). Called from the commit thread
+        after MAX_COMMIT_FAILURES consecutive failures.
+        """
+        logger.warning("⚠️ Recreating CachedKvClient due to persistent commit failures...")
+        self._write_op_log("recreating CachedKvClient")
+        try:
+            evm = EvmClient(
+                rpc_url=self._rpc_url,
+                private_key=self._wallet_private_key,
+            )
+            new_client = CachedKvClient(
+                kv_url=self._kv_url,
+                indexer_url=self._indexer_url,
+                evm_client=evm,
+                flow_address=self._flow_address,
+                max_queue_size=self._max_queue_size,
+                max_cache_entries=self._max_cache_entries,
+                upload_option=UploadOption(skip_tx=False),
+                encryption_key=self._encryption_key,
+            )
+            with self._client_lock:
+                old_client = self._cached
+                self._cached = new_client
+            try:
+                old_client.close()
+            except Exception:
+                pass
+            logger.info("✅ CachedKvClient recreated successfully")
+            self._write_op_log("CachedKvClient recreated successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to recreate CachedKvClient: {e}", exc_info=True)
+
     def _commit_loop(self) -> None:
         """
         Dedicated background thread.
         Wakes up every COMMIT_INTERVAL seconds.
         If _pending_count > 0, calls cached.commit() (non-blocking) and resets
         the counter. If _pending_count == 0, skips the interval silently.
+
+        After MAX_COMMIT_FAILURES consecutive failures the client is recreated
+        so that transient network errors (e.g. SSL failures) can recover without
+        restarting the server.
         """
+        consecutive_failures = 0
         while not self._stop_event.wait(COMMIT_INTERVAL):
             pending = self._pending_count.get_and_reset()
             if not pending:
+                consecutive_failures = 0
                 continue
 
             try:
-                self._cached.commit()
+                with self._client_lock:
+                    self._cached.commit()
+                consecutive_failures = 0
                 logger.info(f"✅ Commit triggered ({pending} pending ops)")
                 self._write_op_log(f"commit triggered ({pending} pending ops)")
             except Exception as e:
-                logger.error(f"❌ Commit failed: {e}", exc_info=True)
+                consecutive_failures += 1
+                logger.error(
+                    f"❌ Commit failed ({consecutive_failures}/{MAX_COMMIT_FAILURES}): {e}",
+                    exc_info=True,
+                )
+                if consecutive_failures >= MAX_COMMIT_FAILURES:
+                    self._recreate_client()
+                    consecutive_failures = 0
 
     # -------------------------------------------------------------------------
     # Internal: write a line to the per-instance operation log file
@@ -222,7 +286,8 @@ class ZeroGKVStorage(KVStorageInterface):
         The commit thread will flush to the chain on the next interval.
         """
         key_bytes = key.encode('utf-8')
-        self._cached.set(self.stream_id, key_bytes, value_bytes)
+        with self._client_lock:
+            self._cached.set(self.stream_id, key_bytes, value_bytes)
         self._pending_count.increment()
         return True
 
@@ -235,7 +300,8 @@ class ZeroGKVStorage(KVStorageInterface):
         self._write_op_log(f"get key={key}")
         try:
             key_bytes = key.encode('utf-8')
-            value_bytes = self._cached.get_bytes(self.stream_id, key_bytes)
+            with self._client_lock:
+                value_bytes = self._cached.get_bytes(self.stream_id, key_bytes)
             if not value_bytes:
                 self._write_op_log(f"get value=None")
                 return None
@@ -277,7 +343,8 @@ class ZeroGKVStorage(KVStorageInterface):
         try:
             for key in keys:
                 key_bytes = key.encode('utf-8')
-                value_bytes = self._cached.get_bytes(self.stream_id, key_bytes)
+                with self._client_lock:
+                    value_bytes = self._cached.get_bytes(self.stream_id, key_bytes)
                 if value_bytes:
                     result[key] = value_bytes.decode('utf-8')
 
@@ -359,7 +426,8 @@ class ZeroGKVStorage(KVStorageInterface):
         # CachedKvClient.close() will itself commit any remaining pending writes
         # and wait for all queued uploads to finish before shutting down the worker.
         try:
-            self._cached.close()
+            with self._client_lock:
+                self._cached.close()
             logger.info("✅ ZeroGKVStorage closed")
         except Exception as e:
             logger.error(f"❌ Failed to close CachedKvClient: {e}")

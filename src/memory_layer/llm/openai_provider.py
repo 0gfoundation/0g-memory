@@ -236,6 +236,9 @@ class OpenAIProvider(LLMProvider):
                 logger.error(f"   ⏱️  Duration: {error_time - start_time:.2f}s")
                 logger.error(f"   💬 Error message: {str(e)}")
                 logger.error(f"retry_num: {retry_num}")
+                if "insufficient balance" in str(e):
+                    logger.error(f"💸 Insufficient balance, aborting retries immediately")
+                    raise LLMError(f"Request failed: {str(e)}")
                 if "HTTP Error 429" in str(e):
                     delay = random.randint(5, 20)
                     logger.warning(f"429 Too Many Requests, waiting {delay}s before retry")
