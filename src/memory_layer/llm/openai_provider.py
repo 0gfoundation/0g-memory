@@ -121,6 +121,14 @@ class OpenAIProvider(LLMProvider):
         elif self.max_tokens is not None:
             data["max_tokens"] = self.max_tokens
 
+        # Disable thinking/reasoning for GLM on integratenetwork to avoid
+        # verbose reasoning_content and excessive latency.
+        if (
+            self.base_url.startswith("https://compute-network-1.integratenetwork.work/v1/proxy")
+            and self.model == "zai-org/GLM-5-FP8"
+        ):
+            data["chat_template_kwargs"] = {"enable_thinking": False}
+
         # Use asynchronous aiohttp instead of synchronous urllib
         headers = {
             'Content-Type': 'application/json',
@@ -155,13 +163,6 @@ class OpenAIProvider(LLMProvider):
                                 )
                                 logger.error(f"   💬 Error message: {error_msg}")
                                 logger.error(f"   📄 Full response: {response_data}")
-                                # Debug: 429 Too Many Requests breakpoint debugging
-                                if response.status == 429:
-                                    logger.warning(
-                                        f"429 Too Many Requests, waiting for 10 seconds"
-                                    )
-                                    await asyncio.sleep(random.randint(5, 20))
-
                                 raise LLMError(f"HTTP Error {response.status}: {error_msg}")
 
                             # Use time.perf_counter() for more precise time measurement
@@ -235,6 +236,10 @@ class OpenAIProvider(LLMProvider):
                 logger.error(f"   ⏱️  Duration: {error_time - start_time:.2f}s")
                 logger.error(f"   💬 Error message: {str(e)}")
                 logger.error(f"retry_num: {retry_num}")
+                if "HTTP Error 429" in str(e):
+                    delay = random.randint(5, 20)
+                    logger.warning(f"429 Too Many Requests, waiting {delay}s before retry")
+                    await asyncio.sleep(delay)
                 if retry_num == max_retries - 1:
                     raise LLMError(f"Request failed: {str(e)}")
 
