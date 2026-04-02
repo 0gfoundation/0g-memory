@@ -195,14 +195,37 @@ class ZeroGKVStorage(KVStorageInterface):
     # Internal: time-based commit loop
     # -------------------------------------------------------------------------
 
-    def _recreate_client(self) -> None:
+    def _recreate_client(self, lost_pending: int) -> None:
         """
         Recreate CachedKvClient after a fatal failure (e.g. SSL error leaving
         the client in a permanent failed state). Called from the commit thread
         after MAX_COMMIT_FAILURES consecutive failures.
+
+        Before swapping, attempts one final commit on the old client so that
+        writes which are still in its internal cache have a last chance to
+        reach the chain.  If that also fails, logs a warning that those writes
+        are permanently lost.
         """
-        logger.warning("⚠️ Recreating CachedKvClient due to persistent commit failures...")
-        self._write_op_log("recreating CachedKvClient")
+        logger.warning(
+            f"⚠️ Recreating CachedKvClient due to persistent commit failures "
+            f"({lost_pending} pending write(s) at risk)..."
+        )
+        self._write_op_log(f"recreating CachedKvClient ({lost_pending} pending writes at risk)")
+
+        # One last attempt to flush the old client's buffer before we discard it.
+        try:
+            with self._client_lock:
+                self._cached.commit()
+            logger.info("✅ Final commit attempt succeeded before client recreation — no data lost")
+            self._write_op_log("final commit before recreation succeeded")
+            lost_pending = 0
+        except Exception as e2:
+            logger.warning(
+                f"⚠️ Final commit attempt also failed: {e2} — "
+                f"{lost_pending} pending write(s) will be lost"
+            )
+            self._write_op_log(f"final commit before recreation failed: {e2} — {lost_pending} writes lost")
+
         try:
             evm = EvmClient(
                 rpc_url=self._rpc_url,
@@ -245,7 +268,8 @@ class ZeroGKVStorage(KVStorageInterface):
         while not self._stop_event.wait(COMMIT_INTERVAL):
             pending = self._pending_count.get_and_reset()
             if not pending:
-                consecutive_failures = 0
+                # No writes to flush — do not reset consecutive_failures here.
+                # A gap with no pending ops should not mask an ongoing failure streak.
                 continue
 
             try:
@@ -261,7 +285,7 @@ class ZeroGKVStorage(KVStorageInterface):
                     exc_info=True,
                 )
                 if consecutive_failures >= MAX_COMMIT_FAILURES:
-                    self._recreate_client()
+                    self._recreate_client(lost_pending=pending)
                     consecutive_failures = 0
 
     # -------------------------------------------------------------------------
