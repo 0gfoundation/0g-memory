@@ -6,7 +6,7 @@ Registers this machine as a user on a remote EverMemOS server (SERVER_MODE=true)
 stores the API key in .evermemos_remote_secrets, and configures Claude Code's
 ~/.claude/settings.json to use the remote server.
 
-Called automatically by install.sh when EVERMEMOS_REMOTE_URL is set in .env.
+Called automatically by install.sh when MEMORY_REMOTE_URL is set in .env.
 Not intended to be run manually.
 """
 
@@ -62,15 +62,15 @@ def main():
     # ── 1. Read .env ──────────────────────────────────────────────────────────
     env_vars = _read_kv_file(project_dir / ".env")
 
-    remote_url = env_vars.get("EVERMEMOS_REMOTE_URL", "").rstrip("/")
-    remote_user_id = env_vars.get("EVERMEMOS_USER_ID", "")
+    remote_url = env_vars.get("MEMORY_REMOTE_URL", "").rstrip("/")
+    remote_user_id = env_vars.get("MEMORY_USER_ID", "")
     wallet_key = env_vars.get("ZEROG_WALLET_KEY", "")
 
     if not remote_url:
-        _fail("EVERMEMOS_REMOTE_URL is not set in .env")
+        _fail("MEMORY_REMOTE_URL is not set in .env")
         sys.exit(1)
     if not remote_user_id:
-        _fail("EVERMEMOS_USER_ID is required when EVERMEMOS_REMOTE_URL is set")
+        _fail("MEMORY_USER_ID is required when MEMORY_REMOTE_URL is set")
         sys.exit(1)
     if not wallet_key:
         _fail("ZEROG_WALLET_KEY is required for remote registration (used for 0G storage)")
@@ -83,10 +83,10 @@ def main():
 
     if api_key:
         _info(f"Credentials already stored in {secrets_path.name}, skipping registration")
-        stored_user_id = secrets.get("EVERMEMOS_USER_ID", remote_user_id)
+        stored_user_id = secrets.get("MEMORY_USER_ID", remote_user_id)
         if stored_user_id != remote_user_id:
             _warn(
-                f"EVERMEMOS_USER_ID in .env ({remote_user_id}) differs from "
+                f"MEMORY_USER_ID in .env ({remote_user_id}) differs from "
                 f"stored user ({stored_user_id}). Using stored user."
             )
             remote_user_id = stored_user_id
@@ -140,7 +140,7 @@ def main():
                     f"       Contact the server admin to reset your API key, then:\n"
                     f"       1. Re-run ./install.sh  (it will retry registration)\n"
                     f"       OR manually create .evermemos_remote_secrets with:\n"
-                    f"          EVERMEMOS_USER_ID={remote_user_id}\n"
+                    f"          MEMORY_USER_ID={remote_user_id}\n"
                     f"          EVERMEMOS_REMOTE_API_KEY=<your_api_key>"
                 )
             else:
@@ -156,7 +156,7 @@ def main():
 
         # ── 4. Store credentials ──────────────────────────────────────────────
         _write_kv_file(secrets_path, {
-            "EVERMEMOS_USER_ID": remote_user_id,
+            "MEMORY_USER_ID": remote_user_id,
             "EVERMEMOS_REMOTE_API_KEY": api_key,
         })
         _ok(f"Registered successfully. Credentials saved to {secrets_path.name}")
@@ -176,17 +176,16 @@ def main():
         settings["env"] = {}
 
     # Force-overwrite (not setdefault) so remote values always take effect.
-    settings["env"]["EVERMEMOS_BASE_URL"] = remote_url
-    settings["env"]["API_BASE_URL"] = remote_url          # backward compat
+    settings["env"]["API_BASE_URL"] = remote_url
     settings["env"]["EVERMEMOS_API_KEY"] = api_key
-    settings["env"]["EVERMEMOS_USER_ID"] = remote_user_id
+    settings["env"]["MEMORY_USER_ID"] = remote_user_id
 
     try:
         settings_path.parent.mkdir(parents=True, exist_ok=True)
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
             f.write("\n")
-        _ok(f"Updated ~/.claude/settings.json (EVERMEMOS_BASE_URL={remote_url})")
+        _ok(f"Updated ~/.claude/settings.json (API_BASE_URL={remote_url})")
     except OSError as e:
         _fail(f"Failed to write {settings_path}: {e}")
         sys.exit(1)

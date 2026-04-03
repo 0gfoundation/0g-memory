@@ -107,6 +107,9 @@ celerybeat.pid
 .0g_secrets
 .evermemos_remote_secrets
 0g_kv_server/config_testnet_turbo.toml
+0g_kv_server/db/
+0g_kv_server/kv.DB
+0g_kv_server/zgs_kv
 .venv
 env/
 venv/
