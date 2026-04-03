@@ -122,6 +122,8 @@ MEMORY_USER_ID=alice      # optional — your name in memory records; leave blan
 ./start_service.sh
 ```
 
+> **OpenClaw users:** After installation, run `openclaw gateway restart` to activate the EverMemOS plugin.
+
 When startup completes successfully, you will see:
 
 ```
