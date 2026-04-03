@@ -40,7 +40,7 @@ from zg_storage import CachedKvClient, EvmClient, UploadOption
 logger = get_logger(__name__)
 
 COMMIT_INTERVAL = 20  # seconds between commit attempts
-MAX_COMMIT_FAILURES = 3  # consecutive failures before attempting client recreation
+MAX_COMMIT_FAILURES = 3  # consecutive failures before attempting client reset
 
 _SECRETS_FILE = ".0g_secrets"
 
@@ -195,64 +195,6 @@ class ZeroGKVStorage(KVStorageInterface):
     # Internal: time-based commit loop
     # -------------------------------------------------------------------------
 
-    def _recreate_client(self, lost_pending: int) -> None:
-        """
-        Recreate CachedKvClient after a fatal failure (e.g. SSL error leaving
-        the client in a permanent failed state). Called from the commit thread
-        after MAX_COMMIT_FAILURES consecutive failures.
-
-        Before swapping, attempts one final commit on the old client so that
-        writes which are still in its internal cache have a last chance to
-        reach the chain.  If that also fails, logs a warning that those writes
-        are permanently lost.
-        """
-        logger.warning(
-            f"⚠️ Recreating CachedKvClient due to persistent commit failures "
-            f"({lost_pending} pending write(s) at risk)..."
-        )
-        self._write_op_log(f"recreating CachedKvClient ({lost_pending} pending writes at risk)")
-
-        # One last attempt to flush the old client's buffer before we discard it.
-        try:
-            with self._client_lock:
-                self._cached.commit()
-            logger.info("✅ Final commit attempt succeeded before client recreation — no data lost")
-            self._write_op_log("final commit before recreation succeeded")
-            lost_pending = 0
-        except Exception as e2:
-            logger.warning(
-                f"⚠️ Final commit attempt also failed: {e2} — "
-                f"{lost_pending} pending write(s) will be lost"
-            )
-            self._write_op_log(f"final commit before recreation failed: {e2} — {lost_pending} writes lost")
-
-        try:
-            evm = EvmClient(
-                rpc_url=self._rpc_url,
-                private_key=self._wallet_private_key,
-            )
-            new_client = CachedKvClient(
-                kv_url=self._kv_url,
-                indexer_url=self._indexer_url,
-                evm_client=evm,
-                flow_address=self._flow_address,
-                max_queue_size=self._max_queue_size,
-                max_cache_entries=self._max_cache_entries,
-                upload_option=UploadOption(skip_tx=False),
-                encryption_key=self._encryption_key,
-            )
-            with self._client_lock:
-                old_client = self._cached
-                self._cached = new_client
-            try:
-                old_client.close()
-            except Exception:
-                pass
-            logger.info("✅ CachedKvClient recreated successfully")
-            self._write_op_log("CachedKvClient recreated successfully")
-        except Exception as e:
-            logger.error(f"❌ Failed to recreate CachedKvClient: {e}", exc_info=True)
-
     def _commit_loop(self) -> None:
         """
         Dedicated background thread.
@@ -260,9 +202,10 @@ class ZeroGKVStorage(KVStorageInterface):
         If _pending_count > 0, calls cached.commit() (non-blocking) and resets
         the counter. If _pending_count == 0, skips the interval silently.
 
-        After MAX_COMMIT_FAILURES consecutive failures the client is recreated
-        so that transient network errors (e.g. SSL failures) can recover without
-        restarting the server.
+        After MAX_COMMIT_FAILURES consecutive failures, reset() is called to
+        clear the failed state while preserving the local cache.  This allows
+        recovery from transient network errors (e.g. SSL failures) without
+        losing cache data, which would cause KV misses on subsequent reads.
         """
         consecutive_failures = 0
         while not self._stop_event.wait(COMMIT_INTERVAL):
@@ -285,7 +228,16 @@ class ZeroGKVStorage(KVStorageInterface):
                     exc_info=True,
                 )
                 if consecutive_failures >= MAX_COMMIT_FAILURES:
-                    self._recreate_client(lost_pending=pending)
+                    try:
+                        with self._client_lock:
+                            self._cached.reset()
+                        logger.warning(
+                            f"⚠️ CachedKvClient reset after {consecutive_failures} consecutive "
+                            f"failures — local cache preserved, will retry on next interval"
+                        )
+                        self._write_op_log(f"client reset after {consecutive_failures} failures")
+                    except Exception as reset_err:
+                        logger.error(f"❌ Failed to reset CachedKvClient: {reset_err}", exc_info=True)
                     consecutive_failures = 0
 
     # -------------------------------------------------------------------------

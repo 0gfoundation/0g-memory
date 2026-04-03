@@ -99,7 +99,39 @@ class EverMemOSClient:
         }
 
         logger.debug(f"search_memories data: {data}")
-        return self._make_request("GET", "/api/v1/memories/search", data=data)
+
+        try:
+            result = self._make_request("GET", "/api/v1/memories/search", data=data)
+        except Exception as e:
+            # Log the error and re-raise it
+            logger.error(f"Search request failed: {e}")
+            raise
+
+        # Log the search results for debugging
+        try:
+            if result and result.get("result"):
+                memories = result.get("result", {}).get("memories", [])
+                logger.info(f"search_memories returned {len(memories)} memory groups")
+
+                # Log detailed results
+                for group_dict in memories:
+                    if isinstance(group_dict, dict):
+                        for group_name, group_memories in group_dict.items():
+                            logger.debug(f"  Group: {group_name} - {len(group_memories)} memories")
+                            if isinstance(group_memories, list):
+                                for idx, mem in enumerate(group_memories[:3]):  # Log first 3 memories per group
+                                    if isinstance(mem, dict):
+                                        timestamp = mem.get("start_time") or mem.get("timestamp") or mem.get("created_at", "Unknown")
+                                        subject = mem.get("subject", "")
+                                        content_preview = (mem.get("episode", "") or mem.get("summary", ""))[:100]
+                                        logger.debug(f"    Memory {idx+1}: [{timestamp}] {subject[:50]}... | {content_preview}...")
+            else:
+                logger.info("search_memories returned no results")
+        except Exception as e:
+            logger.error(f"Error logging search results: {e}")
+            # Still return the result even if logging fails
+
+        return result
 
     def store_message(
         self,
