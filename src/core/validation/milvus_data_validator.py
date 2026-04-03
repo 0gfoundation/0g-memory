@@ -7,7 +7,7 @@ Validates Milvus data completeness against MongoDB and syncs missing documents.
 import time
 import traceback
 from datetime import timedelta
-from typing import Set, List, Dict, Any
+from typing import Set, List, Dict, Any, Optional
 
 from core.observation.logger import get_logger
 from core.di.utils import get_bean_by_type
@@ -17,7 +17,11 @@ from .data_sync_validator import DataSyncValidator, SyncResult
 logger = get_logger(__name__)
 
 
-async def validate_milvus_data(doc_type: str, days: int = 7) -> SyncResult:
+async def validate_milvus_data(
+    doc_type: str,
+    days: int = 7,
+    kv_docs_by_collection: Optional[Dict[str, Dict[str, str]]] = None,
+) -> SyncResult:
     """
     Validate Milvus data completeness for a document type
 
@@ -32,12 +36,14 @@ async def validate_milvus_data(doc_type: str, days: int = 7) -> SyncResult:
 
     try:
         # Route to specific validator based on doc_type
+        # kv_docs_by_collection uses collection names as keys (e.g. "episodic_memories")
+        kv_docs_map = kv_docs_by_collection or {}
         if doc_type == "episodic_memory":
-            result = await _validate_episodic_memory(days)
+            result = await _validate_episodic_memory(days, kv_docs_map.get("episodic_memories", {}))
         elif doc_type == "event_log":
-            result = await _validate_event_log(days)
+            result = await _validate_event_log(days, kv_docs_map.get("event_log_records", {}))
         elif doc_type == "foresight":
-            result = await _validate_foresight(days)
+            result = await _validate_foresight(days, kv_docs_map.get("foresight_records", {}))
         else:
             raise ValueError(f"Unsupported document type: {doc_type}")
 
@@ -61,7 +67,7 @@ async def validate_milvus_data(doc_type: str, days: int = 7) -> SyncResult:
         )
 
 
-async def _validate_episodic_memory(days: int) -> SyncResult:
+async def _validate_episodic_memory(days: int, kv_docs: Dict[str, str]) -> SyncResult:
     """Validate episodic memory documents"""
     from infra_layer.adapters.out.persistence.repository.episodic_memory_raw_repository import (
         EpisodicMemoryRawRepository,
@@ -82,10 +88,11 @@ async def _validate_episodic_memory(days: int) -> SyncResult:
         collection=collection,
         converter_class=EpisodicMemoryMilvusConverter,
         days=days,
+        kv_docs=kv_docs,
     )
 
 
-async def _validate_event_log(days: int) -> SyncResult:
+async def _validate_event_log(days: int, kv_docs: Dict[str, str]) -> SyncResult:
     """Validate event log documents"""
     from infra_layer.adapters.out.persistence.repository.event_log_record_raw_repository import (
         EventLogRecordRawRepository,
@@ -106,10 +113,11 @@ async def _validate_event_log(days: int) -> SyncResult:
         collection=collection,
         converter_class=EventLogMilvusConverter,
         days=days,
+        kv_docs=kv_docs,
     )
 
 
-async def _validate_foresight(days: int) -> SyncResult:
+async def _validate_foresight(days: int, kv_docs: Dict[str, str]) -> SyncResult:
     """Validate foresight documents"""
     from infra_layer.adapters.out.persistence.repository.foresight_record_repository import (
         ForesightRecordRawRepository,
@@ -130,6 +138,7 @@ async def _validate_foresight(days: int) -> SyncResult:
         collection=collection,
         converter_class=ForesightMilvusConverter,
         days=days,
+        kv_docs=kv_docs,
     )
 
 
@@ -139,6 +148,7 @@ async def _validate_and_sync(
     collection: Any,
     converter_class: Any,
     days: int,
+    kv_docs: Optional[Dict[str, str]] = None,
 ) -> SyncResult:
     """
     Common validation and sync logic
@@ -194,6 +204,7 @@ async def _validate_and_sync(
             converter_class=converter_class,
             missing_ids=missing_ids,
             doc_type=doc_type,
+            kv_docs=kv_docs,
         )
 
         return SyncResult(
@@ -298,6 +309,7 @@ async def _sync_missing_documents(
     missing_ids: Set[str],
     doc_type: str,
     batch_size: int = 500,
+    kv_docs: Optional[Dict[str, str]] = None,
 ) -> tuple[int, int]:
     """
     Sync missing documents to Milvus
@@ -309,10 +321,13 @@ async def _sync_missing_documents(
         missing_ids: Set of missing document IDs
         doc_type: Document type name
         batch_size: Batch size for sync operations
+        kv_docs: Optional dict of {doc_id: json_value} from KV scan (used at startup
+                 when there is no KV user context for per-document reads).
 
     Returns:
         Tuple of (synced_count, error_count)
     """
+    import json as _json
     synced_count = 0
     error_count = 0
 
@@ -324,14 +339,23 @@ async def _sync_missing_documents(
         batch_ids = missing_ids_list[i : i + batch_size]
 
         try:
-            # Fetch documents from MongoDB
-            # Convert ObjectId strings to ObjectId for query
-            from bson import ObjectId
-
-            object_ids = [ObjectId(id_str) for id_str in batch_ids]
-
-            query = mongo_repo.model.find({"_id": {"$in": object_ids}})
-            mongo_docs = await query.to_list(length=None)
+            # Load full documents: prefer kv_docs dict (startup phase, no user context)
+            # to avoid DualStorageModelProxy needing a KV user context.
+            if kv_docs:
+                mongo_docs = []
+                for doc_id in batch_ids:
+                    json_value = kv_docs.get(doc_id)
+                    if json_value:
+                        try:
+                            mongo_docs.append(mongo_repo.model._full_model_class.model_validate_json(json_value))
+                        except Exception as e:
+                            logger.warning("Failed to deserialize doc %s from kv_docs: %s", doc_id, e)
+            else:
+                # Normal path: load through DualStorageModelProxy (requires KV user context)
+                from bson import ObjectId
+                object_ids = [ObjectId(id_str) for id_str in batch_ids]
+                query = mongo_repo.model.find({"_id": {"$in": object_ids}})
+                mongo_docs = await query.to_list(length=None)
 
             if not mongo_docs:
                 logger.warning(

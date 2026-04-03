@@ -25,6 +25,7 @@ Concurrency Model:
   individually atomic, so there is no race between the writer and commit thread.
 """
 
+import asyncio
 import os
 import threading
 from datetime import datetime
@@ -361,44 +362,60 @@ class ZeroGKVStorage(KVStorageInterface):
         """
         Iterate all key-value pairs using CachedKvClient's iterator.
         Empty/deleted entries (empty bytes) are skipped.
+
+        The underlying KvIterator issues synchronous HTTP requests (httpx.Client)
+        on every seek/next call, which would block the event loop if called
+        directly from an async context.  We therefore collect all pairs in a
+        thread via asyncio.to_thread(), then yield them back to the caller.
         """
         logger.info("iterate_all")
         try:
-            iterator = self._cached._kv_client.new_iterator(self.stream_id)
-            iterator.seek_to_first()
-
-            total_count = 0
-            skipped_count = 0
-
-            while iterator.valid():
-                key_bytes = iterator.key
-                data_bytes = iterator.data
-
-                key = key_bytes.decode('utf-8')
-
-                if data_bytes and len(data_bytes) > 0:
-                    value = data_bytes.decode('utf-8')
-                    total_count += 1
-                    yield (key, value)
-                else:
-                    skipped_count += 1
-
-                iterator.next()
-
-                if (total_count + skipped_count) % 1000 == 0 and (total_count + skipped_count) > 0:
-                    logger.info(
-                        f"📊 ZeroG iterate progress: {total_count} yielded, "
-                        f"{skipped_count} skipped (empty/deleted)"
-                    )
-
-            logger.info(
-                f"✅ ZeroG iterate_all completed: {total_count} yielded, "
-                f"{skipped_count} skipped"
-            )
-
+            pairs = await asyncio.to_thread(self._collect_all_pairs)
+            for key, value in pairs:
+                yield key, value
         except Exception as e:
             logger.error(f"❌ ZeroG iterate_all failed: {e}", exc_info=True)
             raise
+
+    def _collect_all_pairs(self) -> List[Tuple[str, str]]:
+        """
+        Synchronous worker that runs inside a thread pool (called via
+        asyncio.to_thread).  Walks the KvIterator from first to last and
+        returns all non-empty (key, value) pairs as decoded strings.
+        """
+        results: List[Tuple[str, str]] = []
+        total_count = 0
+        skipped_count = 0
+
+        with self._client_lock:
+            iterator = self._cached._kv_client.new_iterator(self.stream_id)
+
+        iterator.seek_to_first()
+
+        while iterator.valid():
+            key_bytes = iterator.key
+            data_bytes = iterator.data
+            key = key_bytes.decode('utf-8')
+
+            if data_bytes:
+                results.append((key, data_bytes.decode('utf-8')))
+                total_count += 1
+            else:
+                skipped_count += 1
+
+            iterator.next()
+
+            if (total_count + skipped_count) % 1000 == 0 and (total_count + skipped_count) > 0:
+                logger.info(
+                    f"📊 ZeroG iterate progress: {total_count} yielded, "
+                    f"{skipped_count} skipped (empty/deleted)"
+                )
+
+        logger.info(
+            f"✅ ZeroG iterate_all completed: {total_count} yielded, "
+            f"{skipped_count} skipped"
+        )
+        return results
 
     def close(self) -> None:
         """

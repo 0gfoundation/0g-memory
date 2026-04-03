@@ -77,9 +77,17 @@ def file_path_to_module_name(target_path: Path, src_path: Path) -> str:
             return target_path.stem
 
 
-async def setup_project_context(env_file=".env", mock_mode=False):
+async def setup_project_context(env_file=".env", mock_mode=False, client_only=False):
     """
     Set up project context environment - exactly copy the loading logic from run.py
+
+    Args:
+        env_file: Environment file to load
+        mock_mode: Enable mock mode
+        client_only: Skip all infrastructure initialization (MongoDB/Milvus/ES/ZeroG).
+                     Only sets up Python path and loads .env (e.g. API_BASE_URL).
+                     Use this when the script only calls the HTTP API (SimpleMemoryManager),
+                     not when it needs direct DB access.
     """
     # Set flag to indicate we're running via bootstrap.py (not actual backend startup).
     # This serves two purposes:
@@ -95,6 +103,44 @@ async def setup_project_context(env_file=".env", mock_mode=False):
     add_parent_path(0)
 
     from common_utils.load_env import setup_environment
+
+    if client_only:
+        # Client-only mode: skip all DB connections.
+        # We do NOT call setup_environment() here because it always calls sys.exit(1)
+        # when check_env_var=None (the function returns False unless a specific env var
+        # is found).  Instead, load .env and .evermemos_remote_secrets directly.
+        from dotenv import load_dotenv
+        from pathlib import Path as _Path
+
+        project_dir = _Path(__file__).parent.parent  # src/../ = project root
+        env_path = project_dir / env_file
+        if env_path.exists():
+            load_dotenv(env_path)
+            logger.info("🌐 Loaded %s", env_path)
+        else:
+            logger.warning("🌐 %s not found, skipping", env_path)
+
+        # Load .evermemos_remote_secrets (Scenario C credentials: EVERMEMOS_REMOTE_API_KEY)
+        # and map to API_KEY so SimpleMemoryManager picks it up automatically.
+        remote_secrets_path = project_dir / ".evermemos_remote_secrets"
+        if remote_secrets_path.exists():
+            load_dotenv(remote_secrets_path, override=False)
+            remote_key = os.getenv("EVERMEMOS_REMOTE_API_KEY")
+            if remote_key and not os.getenv("API_KEY"):
+                os.environ["API_KEY"] = remote_key
+            logger.info("🌐 Loaded .evermemos_remote_secrets (API_KEY set)")
+        else:
+            logger.info("🌐 .evermemos_remote_secrets not found (Scenario A, no auth needed)")
+
+        # If MEMORY_REMOTE_URL is set, use it as API_BASE_URL so SimpleMemoryManager
+        # calls the remote server instead of localhost.
+        remote_url = os.getenv("MEMORY_REMOTE_URL")
+        if remote_url:
+            os.environ["API_BASE_URL"] = remote_url
+            logger.info("🌐 API_BASE_URL set to MEMORY_REMOTE_URL: %s", remote_url)
+
+        logger.info("🌐 Client-only mode: infrastructure initialization skipped")
+        return
 
     # Set up environment (Python path and .env file)
     setup_environment(load_env_file_name=env_file, check_env_var="MONGODB_HOST")
@@ -151,11 +197,6 @@ Environment variables:
 
     parser.add_argument("script_path", help="Path to the Python script to run")
     parser.add_argument(
-        'script_args',
-        nargs=argparse.REMAINDER,
-        help="Arguments to pass to the target script",
-    )
-    parser.add_argument(
         "--env-file",
         type=str,
         default=".env",
@@ -166,8 +207,20 @@ Environment variables:
         action="store_true",
         help="Enable Mock mode (for testing and development)",
     )
+    parser.add_argument(
+        "--client-only",
+        action="store_true",
+        help=(
+            "Client-only mode: skip all infrastructure initialization (MongoDB/Milvus/ES/ZeroG). "
+            "Use this when connecting to a remote API server (Scenario C). "
+            "Set API_BASE_URL in .env to point to the remote server."
+        ),
+    )
 
-    args = parser.parse_args()
+    # Use parse_known_args so that flags like --client-only are correctly recognised
+    # even when they appear after script_path.  Unknown args are passed to the target script.
+    args, script_args = parser.parse_known_args()
+    args.script_args = script_args
 
     print("🚀 Memsys Bootstrap Script")
     print("=" * 50)
@@ -175,10 +228,15 @@ Environment variables:
     print(f"📝 Script arguments: {args.script_args}")
     print(f"📄 Env File: {args.env_file}")
     print(f"🎭 Mock mode: {'Enabled' if args.mock else 'Disabled'}")
+    print(f"🌐 Client-only mode: {'Enabled' if args.client_only else 'Disabled'}")
     print("=" * 50)
 
     # Set up project context (exactly copy logic from run.py)
-    await setup_project_context(env_file=args.env_file, mock_mode=args.mock)
+    await setup_project_context(
+        env_file=args.env_file,
+        mock_mode=args.mock,
+        client_only=args.client_only,
+    )
 
     # Verify target script exists
     script_path = Path(args.script_path)

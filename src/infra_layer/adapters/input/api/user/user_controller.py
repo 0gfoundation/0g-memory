@@ -35,7 +35,7 @@ class RegisterRequest(BaseModel):
 class RegisterResponse(BaseModel):
     user_id: str
     api_key: str = Field(..., description="Bearer token to use in Authorization header")
-    message: str = "Registration successful. Store your api_key securely — it will not be shown again."
+    message: str = "Registration successful."
 
 
 class UserMeResponse(BaseModel):
@@ -68,7 +68,7 @@ class UserController(BaseController):
         Register a new user for server-side EverMemOS.
 
         - Generates a unique 0G KV stream_id and AES-256 encryption key for this user.
-        - Returns a Bearer API key — store it securely, it is shown only once.
+        - Returns a Bearer API key.
         - Use the API key in `Authorization: Bearer <api_key>` on all subsequent requests.
         """,
     )
@@ -77,8 +77,6 @@ class UserController(BaseController):
         request: FastAPIRequest,
         body: RegisterRequest,
     ) -> RegisterResponse:
-        import asyncio
-        import bcrypt as _bcrypt
         from infra_layer.adapters.out.persistence.document.user.user_secret import (
             UserSecret,
         )
@@ -93,23 +91,36 @@ class UserController(BaseController):
 
         # Generate credentials
         api_key = secrets.token_urlsafe(32)
-        api_key_bytes = api_key.encode()
-        loop = asyncio.get_running_loop()
-        salt = await loop.run_in_executor(None, _bcrypt.gensalt)
-        hash_bytes = await loop.run_in_executor(None, _bcrypt.hashpw, api_key_bytes, salt)
-        api_key_hash = hash_bytes.decode()
         stream_id = secrets.token_hex(32)   # 64-char hex, same format as local .0g_secrets
         enc_key_hex = secrets.token_hex(32)  # 256-bit AES key
 
         secret_doc = UserSecret(
             user_id=body.user_id,
-            api_key_hash=api_key_hash,
+            api_key=api_key,
             zerog_stream_id=stream_id,
             zerog_encryption_key=enc_key_hex,
             zerog_wallet_key=body.zerog_wallet_key,
             created_at=datetime.utcnow(),
         )
         await secret_doc.insert()
+
+        # Backup all users to local file after new registration
+        try:
+            from infra_layer.adapters.out.persistence.user_secret_backup import UserSecretBackup
+            await UserSecretBackup.backup_all_users()
+        except Exception as e:
+            logger.warning("Failed to backup user secrets after registration: %s", e)
+            # Don't fail registration if backup fails
+
+        # Register stream_id in KV node config so it is synced on next restart
+        try:
+            from infra_layer.adapters.out.persistence.kv_storage.kv_node_config import (
+                add_stream_id_to_kv_config,
+            )
+            add_stream_id_to_kv_config(stream_id)
+        except Exception as e:
+            logger.warning("Failed to update KV node config for user %s: %s", body.user_id, e)
+            # Don't fail registration if config update fails
 
         logger.info("Registered new user: %s", body.user_id)
         return RegisterResponse(user_id=body.user_id, api_key=api_key)

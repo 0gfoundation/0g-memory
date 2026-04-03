@@ -94,14 +94,20 @@ for f in "$KV_DIR"/kv_*.log; do
 done
 [ "$kv_log_count" -eq 0 ] && echo "  ℹ️  No kv log files found, skipping"
 
-# ── Step 7 (reverse): Delete .0g_secrets ─────────────────────────────────────
+# ── Step 7 (reverse): Delete .0g_secrets and .evermemos_remote_secrets ────────
 echo ""
-echo "▶  Removing .0g_secrets..."
+echo "▶  Removing secrets files..."
 if [ -f "$SCRIPT_DIR/.0g_secrets" ]; then
     rm "$SCRIPT_DIR/.0g_secrets"
     echo "  ✅ Deleted .0g_secrets"
 else
     echo "  ℹ️  .0g_secrets not found, skipping"
+fi
+if [ -f "$SCRIPT_DIR/.evermemos_remote_secrets" ]; then
+    rm "$SCRIPT_DIR/.evermemos_remote_secrets"
+    echo "  ✅ Deleted .evermemos_remote_secrets"
+else
+    echo "  ℹ️  .evermemos_remote_secrets not found, skipping"
 fi
 
 # ── Step 6b (reverse): Remove hooks and env vars from ~/.claude/settings.json ─

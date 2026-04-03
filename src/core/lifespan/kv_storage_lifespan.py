@@ -84,11 +84,17 @@ class KVStorageLifespan(LifespanProvider):
                         UserAwareKVStorageProxy,
                     )
 
+                    # The global ZEROG_ENCRYPTION_KEY must match the KV node's
+                    # encryption_key in config_testnet_turbo.toml.  All per-user
+                    # ZeroGKVStorage instances share this key so the KV node can
+                    # decrypt and replay every user's stream transactions.
+                    encryption_key_hex = os.getenv("ZEROG_ENCRYPTION_KEY", "")
                     kv_storage = UserAwareKVStorageProxy(
                         kv_url=kv_url,
                         rpc_url=rpc_url,
                         indexer_url=indexer_url,
                         flow_address=flow_address,
+                        encryption_key_hex=encryption_key_hex,
                     )
                     logger.info(
                         f"✅ UserAwareKVStorageProxy initialized\n"

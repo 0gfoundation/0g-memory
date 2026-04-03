@@ -68,6 +68,10 @@ class DataSyncValidationListener(AppReadyListener):
                 check_es,
             )
 
+        # Block all API requests until recovery completes
+        from core.startup.startup_state import mark_recovering
+        mark_recovering()
+
         # Run validation asynchronously (non-blocking)
         asyncio.create_task(self._run_validation(days, check_mongodb, check_milvus, check_es))
 
@@ -83,6 +87,7 @@ class DataSyncValidationListener(AppReadyListener):
             check_milvus: Whether to validate Milvus
             check_es: Whether to validate Elasticsearch
         """
+        from core.startup.startup_state import mark_ready
         from core.validation.milvus_data_validator import validate_milvus_data
         from core.validation.es_data_validator import validate_es_data
         from core.validation.mongodb_data_validator import validate_mongodb_data
@@ -91,13 +96,18 @@ class DataSyncValidationListener(AppReadyListener):
         all_results = []
 
         try:
+            # STEP 0: Restore UserSecret table FIRST (prerequisite for everything else)
+            # In server mode, UserSecret is needed to access any user's 0G stream
+            await self._restore_user_secrets()
+
             # CRITICAL: Validate MongoDB FIRST (before Milvus and ES)
             # MongoDB is the source for Milvus/ES data recovery
             # If MongoDB is missing data, Milvus/ES recovery will fail
+            kv_docs_by_collection: dict = {}
             if check_mongodb:
                 logger.info("Validating MongoDB data against KV Storage...")
                 try:
-                    mongodb_results = await validate_mongodb_data(days)
+                    mongodb_results, kv_docs_by_collection = await validate_mongodb_data(days)
                     all_results.extend(mongodb_results)
                     for result in mongodb_results:
                         self._log_result(result, days)
@@ -109,7 +119,7 @@ class DataSyncValidationListener(AppReadyListener):
                 logger.info("Validating Milvus data...")
                 for doc_type in doc_types:
                     try:
-                        result = await validate_milvus_data(doc_type, days)
+                        result = await validate_milvus_data(doc_type, days, kv_docs_by_collection)
                         all_results.append(result)
                         self._log_result(result, days)
                     except Exception as e:
@@ -122,7 +132,7 @@ class DataSyncValidationListener(AppReadyListener):
                 logger.info("Validating Elasticsearch data...")
                 for doc_type in doc_types:
                     try:
-                        result = await validate_es_data(doc_type, days)
+                        result = await validate_es_data(doc_type, days, kv_docs_by_collection)
                         all_results.append(result)
                         self._log_result(result, days)
                     except Exception as e:
@@ -162,6 +172,36 @@ class DataSyncValidationListener(AppReadyListener):
 
         except Exception as e:
             logger.error("❌ Startup sync validation failed: %s", e, exc_info=True)
+        finally:
+            mark_ready()
+            logger.info("✅ Startup recovery complete, API gate opened")
+
+    async def _restore_user_secrets(self) -> None:
+        """
+        Restore UserSecret table from local backup if needed.
+        This must happen BEFORE any 0G stream access.
+        """
+        import os
+
+        try:
+            # Only do this in server mode
+            server_mode = os.getenv("SERVER_MODE", "false").lower() == "true"
+            if not server_mode:
+                logger.debug("Local mode detected, skipping UserSecret restore")
+                return
+
+            logger.info("🔑 Checking UserSecret table for server mode...")
+
+            from infra_layer.adapters.out.persistence.user_secret_backup import UserSecretBackup
+
+            # Try to restore from backup.
+            # Returns True if backup file was found (KV scan can proceed).
+            # Returns False if backup file is missing (restore_to_mongodb already logged the reason).
+            await UserSecretBackup.restore_to_mongodb()
+
+        except Exception as e:
+            logger.error("❌ Failed to restore UserSecret table: %s", e)
+            # Don't crash startup if this fails - let the system try to continue
 
     def _log_result(self, result: SyncResult, days: int) -> None:
         """
