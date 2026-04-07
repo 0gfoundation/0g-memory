@@ -106,7 +106,7 @@ MEMORY_USER_ID=alice      # optional — your name in memory records; leave blan
 
 > **Note on `RERANK_API_KEY`:** OpenAI does not provide a reranking API. The default rerank provider is **[DeepInfra](https://deepinfra.com)** — sign up, copy your API key, and paste it here. The default model is `Qwen/Qwen3-Reranker-4B`. `RERANK_BASE_URL` and `RERANK_MODEL` in `.env` let you point to any compatible rerank endpoint (e.g. a self-hosted vLLM instance).
 
-> `LLM_BASE_URL` and `LLM_MODEL` in `.env` let you point to any OpenAI-compatible endpoint. The defaults use **OpenAI directly** (`gpt-4o-mini`). To switch to [OpenRouter](https://openrouter.ai) or another provider, update `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY` accordingly.
+> `LLM_BASE_URL` and `LLM_MODEL` in `.env` let you point to any OpenAI-compatible endpoint. The defaults use **OpenAI directly** (`gpt-4o-mini`). To switch to [OpenRouter](https://openrouter.ai) or another provider, update `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY` accordingly. To use a 0G-hosted GLM model instead, see [Appendix F](#appendix-f-using-the-0g-hosted-glm-model).
 
 ### 2. Install
 
@@ -634,3 +634,25 @@ Start your AI coding assistant. Follow the same [2-minute test](#4-verify-memory
 - You do **not** need to run `./start_service.sh` — there is no local service to start.
 - To uninstall, run `./uninstall.sh`. This removes the local integration and credentials but does **not** delete your memories from the remote server.
 - If registration fails with "user already exists", contact the server admin to reset your API key, or manually create `.evermemos_remote_secrets` with your credentials.
+
+### Appendix F: Using the 0G-Hosted GLM Model
+
+[0G Compute](https://compute-marketplace.0g.ai/) hosts GLM models on its decentralized compute network. Using a 0G-hosted model keeps your entire stack — storage and inference — within the 0G ecosystem.
+
+#### Step 1 — Get an API key
+
+Visit [https://compute-marketplace.0g.ai/](https://compute-marketplace.0g.ai/) and follow the instructions to create an API key. The key will have the format `app-sk-<base64-encoded-token>`.
+
+#### Step 2 — Update `.env`
+
+Replace the three LLM variables in `.env`:
+
+```bash
+LLM_API_KEY=app-sk-<your key here>
+LLM_MODEL=zai-org/GLM-5-FP8
+LLM_BASE_URL=https://compute-network-1.integratenetwork.work/v1/proxy
+```
+
+> `VECTORIZE_API_KEY` and `RERANK_API_KEY` are for separate embedding and rerank services — they still need to be filled in independently (see the Configure section above).
+
+For full provider documentation, visit [https://compute-marketplace.0g.ai/](https://compute-marketplace.0g.ai/).

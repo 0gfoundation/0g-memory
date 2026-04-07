@@ -6,16 +6,12 @@ from infra_layer.adapters.out.persistence.document.memory.conversation_status im
 )
 from core.observation.logger import get_logger
 from core.di.decorators import repository
-from infra_layer.adapters.out.persistence.kv_storage.dual_storage_mixin import (
-    DualStorageMixin,
-)
 
 logger = get_logger(__name__)
 
 
 @repository("conversation_status_raw_repository", primary=True)
 class ConversationStatusRawRepository(
-    DualStorageMixin,  # Add dual storage support - automatically intercepts MongoDB calls
     BaseRepository[ConversationStatus],
 ):
     """
@@ -23,7 +19,8 @@ class ConversationStatusRawRepository(
 
     Provides CRUD operations and query capabilities for conversation status data.
 
-    Dual Storage: DualStorageMixin automatically intercepts all MongoDB operations
+    MongoDB only: conversation_status is operational metadata (processing cursor),
+    not permanent memory content, so dual storage to 0G KV is not needed.
     """
 
     def __init__(self):
