@@ -13,6 +13,7 @@ from core.middleware.user_context_middleware import UserContextMiddleware
 from core.middleware.app_logic_middleware import AppLogicMiddleware
 from core.middleware.prometheus_middleware import PrometheusMiddleware
 from core.middleware.multi_user_auth_middleware import MultiUserAuthMiddleware
+from core.middleware.recovery_gate_middleware import RecoveryGateMiddleware
 from fastapi.middleware import Middleware
 
 from base_app import create_base_app
@@ -120,6 +121,9 @@ def create_business_app(
         cors_allow_headers=cors_allow_headers,
         lifespan_context=combined_lifespan,
     )
+
+    # Gate all requests during startup data recovery (outermost = executes first)
+    fastapi_app.add_middleware(RecoveryGateMiddleware)
 
     # Add business-related middleware
     fastapi_app.user_middleware.append(Middleware(AppLogicMiddleware))

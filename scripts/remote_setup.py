@@ -76,90 +76,66 @@ def main():
         _fail("ZEROG_WALLET_KEY is required for remote registration (used for 0G storage)")
         sys.exit(1)
 
-    # ── 2. Check .evermemos_remote_secrets ────────────────────────────────────
+    # ── 2. Register with remote server (always, to get a fresh API key) ─────────
     secrets_path = project_dir / ".evermemos_remote_secrets"
-    secrets = _read_kv_file(secrets_path)
-    api_key = secrets.get("EVERMEMOS_REMOTE_API_KEY", "")
 
-    if api_key:
-        _info(f"Credentials already stored in {secrets_path.name}, skipping registration")
-        stored_user_id = secrets.get("MEMORY_USER_ID", remote_user_id)
-        if stored_user_id != remote_user_id:
-            _warn(
-                f"MEMORY_USER_ID in .env ({remote_user_id}) differs from "
-                f"stored user ({stored_user_id}). Using stored user."
-            )
-            remote_user_id = stored_user_id
-    else:
-        # ── 3. Register with remote server ────────────────────────────────────
-        _info(f"Registering user '{remote_user_id}' on {remote_url} ...")
+    _info(f"Registering user '{remote_user_id}' on {remote_url} ...")
 
-        register_url = f"{remote_url}/api/v1/users/register"
-        payload = json.dumps({
-            "user_id": remote_user_id,
-            "zerog_wallet_key": wallet_key,
-        }).encode("utf-8")
+    register_url = f"{remote_url}/api/v1/users/register"
+    payload = json.dumps({
+        "user_id": remote_user_id,
+        "zerog_wallet_key": wallet_key,
+    }).encode("utf-8")
 
-        req = urllib.request.Request(
-            register_url,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
+    req = urllib.request.Request(
+        register_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
 
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                raw = resp.read().decode("utf-8")
-                try:
-                    body = json.loads(raw)
-                except json.JSONDecodeError:
-                    _fail(
-                        f"Registration endpoint returned non-JSON response.\n"
-                        f"       Raw response: {raw[:200]}\n"
-                        f"       Check that {remote_url} is a valid EverMemOS server."
-                    )
-                    sys.exit(1)
-                api_key = body.get("api_key", "")
-                if not api_key:
-                    _fail(
-                        f"Registration response did not contain an api_key.\n"
-                        f"       Response: {raw[:200]}"
-                    )
-                    sys.exit(1)
-        except urllib.error.HTTPError as e:
-            error_body = ""
-            if e.fp:
-                try:
-                    error_body = e.read().decode("utf-8")
-                except Exception:
-                    pass
-            if e.code == 409:
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            raw = resp.read().decode("utf-8")
+            try:
+                body = json.loads(raw)
+            except json.JSONDecodeError:
                 _fail(
-                    f"User '{remote_user_id}' already exists on the remote server, "
-                    f"but no local credentials were found.\n"
-                    f"       Contact the server admin to reset your API key, then:\n"
-                    f"       1. Re-run ./install.sh  (it will retry registration)\n"
-                    f"       OR manually create .evermemos_remote_secrets with:\n"
-                    f"          MEMORY_USER_ID={remote_user_id}\n"
-                    f"          EVERMEMOS_REMOTE_API_KEY=<your_api_key>"
+                    f"Registration endpoint returned non-JSON response.\n"
+                    f"       Raw response: {raw[:200]}\n"
+                    f"       Check that {remote_url} is a valid EverMemOS server."
                 )
-            else:
-                _fail(f"Registration failed: HTTP {e.code} — {error_body}")
-            sys.exit(1)
-        except urllib.error.URLError as e:
-            _fail(
-                f"Cannot reach remote server at {remote_url}\n"
-                f"       Reason: {e.reason}\n"
-                f"       Check the URL and network connectivity."
-            )
-            sys.exit(1)
+                sys.exit(1)
+            api_key = body.get("api_key", "")
+            if not api_key:
+                _fail(
+                    f"Registration response did not contain an api_key.\n"
+                    f"       Response: {raw[:200]}"
+                )
+                sys.exit(1)
+    except urllib.error.HTTPError as e:
+        error_body = ""
+        if e.fp:
+            try:
+                error_body = e.read().decode("utf-8")
+            except Exception:
+                pass
+        _fail(f"Registration failed: HTTP {e.code} — {error_body}")
+        sys.exit(1)
+    except urllib.error.URLError as e:
+        _fail(
+            f"Cannot reach remote server at {remote_url}\n"
+            f"       Reason: {e.reason}\n"
+            f"       Check the URL and network connectivity."
+        )
+        sys.exit(1)
 
-        # ── 4. Store credentials ──────────────────────────────────────────────
-        _write_kv_file(secrets_path, {
-            "MEMORY_USER_ID": remote_user_id,
-            "EVERMEMOS_REMOTE_API_KEY": api_key,
-        })
-        _ok(f"Registered successfully. Credentials saved to {secrets_path.name}")
+    # ── 3. Store credentials (overwrite) ─────────────────────────────────────
+    _write_kv_file(secrets_path, {
+        "MEMORY_USER_ID": remote_user_id,
+        "EVERMEMOS_REMOTE_API_KEY": api_key,
+    })
+    _ok(f"Registered successfully. Credentials saved to {secrets_path.name}")
 
     # ── 5. Update ~/.claude/settings.json ─────────────────────────────────────
     settings_path = Path.home() / ".claude" / "settings.json"

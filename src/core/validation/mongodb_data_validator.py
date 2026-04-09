@@ -10,7 +10,7 @@ enabling queries and data recovery for Milvus/ES.
 
 import time
 import json
-from typing import Set, Dict, Any, List
+from typing import Set, Dict, Any, List, Tuple
 from collections import defaultdict
 from bson import ObjectId
 
@@ -23,7 +23,7 @@ from .data_sync_validator import SyncResult
 logger = get_logger(__name__)
 
 
-async def validate_mongodb_data(days: int = 7) -> List[SyncResult]:
+async def validate_mongodb_data(days: int = 7) -> Tuple[List[SyncResult], Dict[str, Dict[str, str]]]:
     """
     Validate MongoDB data completeness against KV Storage
 
@@ -34,7 +34,9 @@ async def validate_mongodb_data(days: int = 7) -> List[SyncResult]:
               Note: Currently checks ALL documents from KV Storage regardless of days parameter
 
     Returns:
-        List[SyncResult]: Results for each collection
+        Tuple of (List[SyncResult], kv_docs_by_collection).
+        kv_docs_by_collection is Dict[collection_name, Dict[doc_id, json_value]] —
+        passed to Milvus/ES validators so they can load full docs without KV user context.
     """
     start_time = time.time()
     results = []
@@ -74,7 +76,7 @@ async def validate_mongodb_data(days: int = 7) -> List[SyncResult]:
         for result in results:
             result.elapsed_time = elapsed
 
-        return results
+        return results, kv_docs_by_collection
 
     except Exception as e:
         logger.error(f"❌ MongoDB validation failed: {e}", exc_info=True)
@@ -86,7 +88,7 @@ async def validate_mongodb_data(days: int = 7) -> List[SyncResult]:
             synced_count=0,
             error_count=1,
             elapsed_time=time.time() - start_time
-        )]
+        )], {}
 
 
 async def _scan_kv_storage(kv_storage: KVStorageInterface) -> Dict[str, Dict[str, str]]:
@@ -222,7 +224,8 @@ def _get_repository_for_collection(collection_name: str):
         "foresight_records": "ForesightRecordRawRepository",
         "core_memories": "CoreMemoryRawRepository",
         "conversation_metas": "ConversationMetaRawRepository",
-        "conversation_status": "ConversationStatusRawRepository",
+        # conversation_status is excluded: it is operational metadata (processing cursor),
+        # not stored in 0G KV (no DualStorageMixin on ConversationStatusRawRepository).
         "user_profiles": "UserProfileRawRepository",
         "group_profiles": "GroupProfileRawRepository",
         "group_user_profile_memories": "GroupUserProfileMemoryRawRepository",

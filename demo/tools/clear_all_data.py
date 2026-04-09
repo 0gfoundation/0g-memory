@@ -134,13 +134,22 @@ def _clear_milvus(
             if not related_collections:
                 continue
 
-            if not drop_collections:
-                for real_name in related_collections:
+            # Measure counts BEFORE any deletion
+            counts_before: Dict[str, int] = {}
+            for real_name in related_collections:
+                try:
                     coll = Collection(name=real_name, using=collection.using)
                     coll.load()
-                    before_count = coll.num_entities
-                    if before_count == 0:
+                    counts_before[real_name] = _get_milvus_row_count(real_name, coll)
+                except Exception:
+                    counts_before[real_name] = 0
+
+            if not drop_collections:
+                for real_name in related_collections:
+                    if counts_before.get(real_name, 0) == 0:
                         continue
+                    coll = Collection(name=real_name, using=collection.using)
+                    coll.load()
                     coll.delete(expr="id != ''")
                     coll.flush()
 
@@ -151,14 +160,7 @@ def _clear_milvus(
                 pass
 
             for real_name in related_collections:
-                before_count = 0
-                try:
-                    coll = Collection(name=real_name, using=collection.using)
-                    coll.load()
-                    before_count = coll.num_entities
-                except Exception:
-                    before_count = 0
-
+                before_count = counts_before.get(real_name, 0)
                 utility.drop_collection(real_name, using=collection.using)
                 stats["cleared"].append(
                     {"collection": real_name, "deleted": before_count, "dropped": True}

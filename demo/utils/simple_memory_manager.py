@@ -84,6 +84,7 @@ class SimpleMemoryManager:
         base_url: str = None,
         group_id: str = "default_group",
         scene: str = "assistant",
+        api_key: str = None,
     ):
         """Initialize the manager
 
@@ -91,6 +92,8 @@ class SimpleMemoryManager:
             base_url: API server address (default: from API_BASE_URL env or http://localhost:1995)
             group_id: Group ID (default: default_group)
             scene: Scene type (default: "assistant", options: "assistant" or "companion")
+            api_key: API key for server-mode authentication (default: from API_KEY env).
+                     Leave None/unset for Scenario A (local mode, no auth required).
         """
         # Use environment variable API_BASE_URL if base_url not provided
         if base_url is None:
@@ -106,6 +109,9 @@ class SimpleMemoryManager:
         self._conversation_meta_saved = (
             False  # Flag to indicate if conversation-meta is saved
         )
+        # API key for Scenario B/C (server mode). None = no auth header sent (Scenario A).
+        _key = api_key or os.getenv("API_KEY")
+        self._headers = {"Authorization": f"Bearer {_key}"} if _key else {}
 
     async def store(self, content: str, sender: str = "User") -> bool:
         """Store a message
@@ -145,7 +151,7 @@ class SimpleMemoryManager:
 
         try:
             async with httpx.AsyncClient(timeout=500.0) as client:
-                response = await client.post(self.memorize_url, json=message_data)
+                response = await client.post(self.memorize_url, json=message_data, headers=self._headers)
                 response.raise_for_status()
                 result = response.json()
 
@@ -209,7 +215,7 @@ class SimpleMemoryManager:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    self.conversation_meta_url, json=conversation_meta_request
+                    self.conversation_meta_url, json=conversation_meta_request, headers=self._headers
                 )
                 response.raise_for_status()
                 result = response.json()
@@ -273,7 +279,7 @@ class SimpleMemoryManager:
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(self.retrieve_url, params=payload)
+                response = await client.get(self.retrieve_url, params=payload, headers=self._headers)
                 response.raise_for_status()
                 result = response.json()
 

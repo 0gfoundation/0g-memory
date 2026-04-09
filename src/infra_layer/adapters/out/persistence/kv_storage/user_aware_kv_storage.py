@@ -42,11 +42,15 @@ class UserAwareKVStorageProxy(KVStorageInterface):
         rpc_url: str,
         indexer_url: str,
         flow_address: str,
+        encryption_key_hex: str = "",
     ) -> None:
         self._kv_url = kv_url
         self._rpc_url = rpc_url
         self._indexer_url = indexer_url
         self._flow_address = flow_address
+        # Global encryption key shared by all users — must match the KV node's
+        # encryption_key in config_testnet_turbo.toml so the node can replay txs.
+        self._encryption_key: Optional[bytes] = bytes.fromhex(encryption_key_hex) if encryption_key_hex else None
         # user_id -> ZeroGKVStorage (lazy, created on first request per user)
         self._cache: Dict[str, KVStorageInterface] = {}
 
@@ -88,7 +92,7 @@ class UserAwareKVStorageProxy(KVStorageInterface):
                 indexer_url=self._indexer_url,
                 flow_address=self._flow_address,
                 stream_id=stream_id,
-                encryption_key=bytes.fromhex(enc_key_hex),
+                encryption_key=self._encryption_key,
                 wallet_private_key=wallet_key,
             )
         return self._cache[user_id]
@@ -126,13 +130,99 @@ class UserAwareKVStorageProxy(KVStorageInterface):
         return await self._current().batch_delete(keys)
 
     async def iterate_all(self) -> AsyncIterator[Tuple[str, str]]:
-        # In server mode each user has their own stream; a global scan without
-        # a user context (e.g. startup data-sync) yields nothing.
+        """Iterate all KV entries.
+
+        - With user context: iterate current user's stream
+        - Without user context (startup): iterate ALL users' streams for data recovery
+        """
         storage = _kv_user_context.get()
-        if storage is None:
-            return
-        async for item in storage.iterate_all():
-            yield item
+        if storage is not None:
+            # Normal request with user context: iterate current user's stream
+            async for item in storage.iterate_all():
+                yield item
+        else:
+            # No user context (startup data-sync): iterate ALL users' streams
+            logger.info("🔄 Starting multi-user KV scan for startup data recovery...")
+            async for item in self._iterate_all_users():
+                yield item
+
+    async def _iterate_all_users(self) -> AsyncIterator[Tuple[str, str]]:
+        """Iterate through all users' streams for startup data recovery.
+
+        This is called during startup when there's no user context.
+        Reads all user credentials from MongoDB and scans each user's stream.
+        """
+        try:
+            # Import here to avoid circular dependency
+            from infra_layer.adapters.out.persistence.document.user.user_secret import UserSecret
+            from infra_layer.adapters.out.persistence.kv_storage.zerog_kv_storage import ZeroGKVStorage
+
+            # Get all users from MongoDB
+            users = await UserSecret.find_all().to_list()
+
+            if not users:
+                logger.info("📭 No users found in database, skipping multi-user KV scan")
+                return
+
+            logger.info("📊 Found %d users, scanning their streams...", len(users))
+            user_count = 0
+            total_docs = 0
+            failed_users: list = []
+
+            for user in users:
+                user_count += 1
+                logger.info("[%d/%d] Scanning stream for user: %s",
+                           user_count, len(users), user.user_id)
+
+                user_storage = None
+                try:
+                    # Create temporary ZeroGKVStorage instance for this user
+                    user_storage = ZeroGKVStorage(
+                        kv_url=self._kv_url,
+                        rpc_url=self._rpc_url,
+                        indexer_url=self._indexer_url,
+                        flow_address=self._flow_address,
+                        stream_id=user.zerog_stream_id,
+                        encryption_key=self._encryption_key,
+                        wallet_private_key=user.zerog_wallet_key,
+                    )
+
+                    # Iterate this user's stream
+                    user_docs = 0
+                    async for key, value in user_storage.iterate_all():
+                        user_docs += 1
+                        total_docs += 1
+                        yield key, value
+
+                    if user_docs > 0:
+                        logger.info("   ✓ Scanned %d documents for user %s",
+                                   user_docs, user.user_id)
+                    else:
+                        logger.debug("   - No documents for user %s", user.user_id)
+
+                except Exception as e:
+                    logger.error("❌ Failed to scan stream for user %s: %s",
+                                user.user_id, e)
+                    failed_users.append(user.user_id)
+                finally:
+                    if user_storage is not None:
+                        try:
+                            user_storage.close()
+                        except Exception as close_err:
+                            logger.error("❌ Failed to close storage for user %s: %s",
+                                        user.user_id, close_err)
+
+            if failed_users:
+                logger.warning(
+                    "⚠️  Multi-user KV scan: %d/%d users failed — %s",
+                    len(failed_users), len(users), failed_users,
+                )
+            logger.info("✅ Multi-user KV scan complete: %d users, %d total documents",
+                       user_count, total_docs)
+
+        except Exception as e:
+            logger.error("❌ Multi-user KV scan failed: %s", e)
+            # Don't raise - allow startup to continue even if scan fails
 
     def close(self) -> None:
         for user_id, storage in self._cache.items():
