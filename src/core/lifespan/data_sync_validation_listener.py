@@ -95,6 +95,17 @@ class DataSyncValidationListener(AppReadyListener):
         doc_types = ["episodic_memory", "event_log", "foresight"]
         all_results = []
 
+        # kv_docs_by_collection is populated by MongoDB validation and used by Milvus/ES recovery.
+        # If Milvus or ES validation is enabled but MongoDB is not, force MongoDB on so that
+        # kv_docs_by_collection is always available (avoids falling back to DualStorageModelProxy
+        # reads that require a per-user KV context during startup).
+        if (check_milvus or check_es) and not check_mongodb:
+            logger.warning(
+                "STARTUP_SYNC_MONGODB=false but Milvus/ES validation is enabled — "
+                "forcing MongoDB validation on to populate kv_docs cache for recovery"
+            )
+            check_mongodb = True
+
         try:
             # STEP 0: Restore UserSecret table FIRST (prerequisite for everything else)
             # In server mode, UserSecret is needed to access any user's 0G stream
@@ -172,6 +183,10 @@ class DataSyncValidationListener(AppReadyListener):
 
         except Exception as e:
             logger.error("❌ Startup sync validation failed: %s", e, exc_info=True)
+            logger.error(
+                "⚠️  API gate will open but service may be degraded — "
+                "check logs above for root cause"
+            )
         finally:
             mark_ready()
             logger.info("✅ Startup recovery complete, API gate opened")
@@ -180,28 +195,22 @@ class DataSyncValidationListener(AppReadyListener):
         """
         Restore UserSecret table from local backup if needed.
         This must happen BEFORE any 0G stream access.
+        Raises on failure so the caller can log a degraded-service warning.
         """
         import os
 
-        try:
-            # Only do this in server mode
-            server_mode = os.getenv("SERVER_MODE", "false").lower() == "true"
-            if not server_mode:
-                logger.debug("Local mode detected, skipping UserSecret restore")
-                return
+        # Only do this in server mode
+        server_mode = os.getenv("SERVER_MODE", "false").lower() == "true"
+        if not server_mode:
+            logger.debug("Local mode detected, skipping UserSecret restore")
+            return
 
-            logger.info("🔑 Checking UserSecret table for server mode...")
+        logger.info("🔑 Checking UserSecret table for server mode...")
 
-            from infra_layer.adapters.out.persistence.user_secret_backup import UserSecretBackup
+        from infra_layer.adapters.out.persistence.user_secret_backup import UserSecretBackup
 
-            # Try to restore from backup.
-            # Returns True if backup file was found (KV scan can proceed).
-            # Returns False if backup file is missing (restore_to_mongodb already logged the reason).
-            await UserSecretBackup.restore_to_mongodb()
-
-        except Exception as e:
-            logger.error("❌ Failed to restore UserSecret table: %s", e)
-            # Don't crash startup if this fails - let the system try to continue
+        # Let any exception propagate — caller's finally block ensures mark_ready() runs.
+        await UserSecretBackup.restore_to_mongodb()
 
     def _log_result(self, result: SyncResult, days: int) -> None:
         """
