@@ -242,7 +242,7 @@ class UserSecretBackup:
 
         except Exception as e:
             logger.error("❌ Failed to restore users to MongoDB: %s", e)
-            return False
+            raise
 
     @staticmethod
     def _parse_datetime_safe(date_str: str):

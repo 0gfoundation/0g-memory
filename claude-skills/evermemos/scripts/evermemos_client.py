@@ -34,6 +34,13 @@ class EverMemOSClient:
         self.user_id = user_id
         self.group_id = group_id
 
+    def _do_urlopen(self, req: urllib.request.Request, timeout: int, bypass_proxy: bool = False):
+        """Execute urlopen, optionally bypassing system proxy."""
+        if bypass_proxy:
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            return opener.open(req, timeout=timeout)
+        return urllib.request.urlopen(req, timeout=timeout)
+
     def _make_request(
         self,
         method: str,
@@ -41,7 +48,7 @@ class EverMemOSClient:
         data: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
-        """Make HTTP request to EverMemOS API"""
+        """Make HTTP request to EverMemOS API, falling back to direct connection on proxy error."""
         url = f"{self.base_url}{endpoint}"
 
         # Add query parameters
@@ -57,18 +64,29 @@ class EverMemOSClient:
 
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
 
-        try:
-            with urllib.request.urlopen(req, timeout=30) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            error_body = e.read().decode("utf-8") if e.fp else "No error details"
-            raise Exception(
-                f"HTTP {e.code} Error: {e.reason}\nDetails: {error_body}"
-            )
-        except urllib.error.URLError as e:
-            raise Exception(f"Connection Error: {e.reason}")
-        except Exception as e:
-            raise Exception(f"Request failed: {str(e)}")
+        proxy_configured = any(os.environ.get(k) for k in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"))
+
+        for bypass_proxy in (False, True):
+            try:
+                with self._do_urlopen(req, timeout=30, bypass_proxy=bypass_proxy) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode("utf-8") if e.fp else "No error details"
+                # Proxy returned 502 — retry direct
+                if e.code == 502 and not bypass_proxy and proxy_configured:
+                    logger.warning(f"Proxy returned 502, retrying direct connection to {self.base_url}")
+                    continue
+                raise Exception(
+                    f"HTTP {e.code} Error: {e.reason}\nDetails: {error_body}"
+                )
+            except urllib.error.URLError as e:
+                # Proxy itself unreachable — retry direct
+                if not bypass_proxy and proxy_configured:
+                    logger.warning(f"Proxy connection failed ({e.reason}), retrying direct connection to {self.base_url}")
+                    continue
+                raise Exception(f"Connection Error: {e.reason}")
+            except Exception as e:
+                raise Exception(f"Request failed: {str(e)}")
 
     def search_memories(
         self,

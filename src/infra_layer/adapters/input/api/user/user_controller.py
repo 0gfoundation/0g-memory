@@ -84,9 +84,13 @@ class UserController(BaseController):
         # Check for duplicate user_id
         existing = await UserSecret.find_one(UserSecret.user_id == body.user_id)
         if existing:
+            if existing.zerog_wallet_key == body.zerog_wallet_key:
+                # Same user re-registering (e.g. after uninstall) — return existing api_key
+                logger.info("User '%s' re-registered with matching wallet key, returning existing api_key", body.user_id)
+                return RegisterResponse(user_id=body.user_id, api_key=existing.api_key, message="Already registered.")
             raise HTTPException(
-                status_code=409,
-                detail=f"User '{body.user_id}' already exists.",
+                status_code=403,
+                detail=f"User '{body.user_id}' already exists with a different wallet key.",
             )
 
         # Generate credentials

@@ -31,11 +31,28 @@ logger = get_logger("hook_tool_use")
 
 def _is_service_available():
     base_url = os.environ.get('API_BASE_URL', 'http://localhost:1995')
-    try:
-        urllib.request.urlopen(f"{base_url}/health", timeout=10)
-        return True
-    except Exception:
-        return False
+    url = f"{base_url}/health"
+    proxy_configured = any(os.environ.get(k) for k in ('http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY'))
+
+    for bypass_proxy in (False, True):
+        try:
+            if bypass_proxy:
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                opener.open(url, timeout=10)
+            else:
+                urllib.request.urlopen(url, timeout=10)
+            return True
+        except urllib.error.HTTPError as e:
+            if e.code == 502 and not bypass_proxy and proxy_configured:
+                continue
+            return False
+        except urllib.error.URLError:
+            if not bypass_proxy and proxy_configured:
+                continue
+            return False
+        except Exception:
+            return False
+    return False
 
 
 def read_hook_input():

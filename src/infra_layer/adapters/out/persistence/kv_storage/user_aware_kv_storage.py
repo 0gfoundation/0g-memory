@@ -222,7 +222,7 @@ class UserAwareKVStorageProxy(KVStorageInterface):
 
         except Exception as e:
             logger.error("❌ Multi-user KV scan failed: %s", e)
-            # Don't raise - allow startup to continue even if scan fails
+            raise
 
     def close(self) -> None:
         for user_id, storage in self._cache.items():
