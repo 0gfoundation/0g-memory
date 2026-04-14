@@ -96,7 +96,10 @@ KV_TS=$(date -u +"%Y%m%d_%H%M%S")
 KV_LOG="$KV_RUN_DIR/kv_${KV_TS}.log"
 KV_STARTED=false
 
-if pgrep -f "zgs_kv" > /dev/null 2>&1; then
+KV_PORT_OPEN=false
+(echo > /dev/tcp/localhost/6789) 2>/dev/null && KV_PORT_OPEN=true || true
+
+if pgrep -f "zgs_kv" > /dev/null 2>&1 && [ "$KV_PORT_OPEN" = true ]; then
     echo "  ✅ kv-server already running, skipping"
 elif [ ! -f "$KV_BIN" ]; then
     echo "  ⚠️  kv-server binary not found at $KV_BIN, skipping"

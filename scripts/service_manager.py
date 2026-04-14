@@ -31,20 +31,28 @@ class ServiceManager:
         self.log_file = existing_logs[-1] if existing_logs else logs_dir / "evermemos.log"
 
     def is_running(self) -> bool:
-        """Check if service is running"""
+        """Check if service is running by verifying both the PID and port 1995."""
         if not self.pid_file.exists():
             return False
 
         try:
             pid = int(self.pid_file.read_text().strip())
-            # Check if process exists
-            os.kill(pid, 0)
-            return True
+            os.kill(pid, 0)  # process exists
         except PermissionError:
-            # Process exists but owned by another user
-            return True
+            pass  # exists, owned by another user — fall through to port check
         except (ProcessLookupError, ValueError):
             # Process doesn't exist, clean up stale PID file
+            self.pid_file.unlink(missing_ok=True)
+            return False
+
+        # Process exists — also verify port 1995 is actually listening.
+        # A zombie or mis-matched PID can fool os.kill(pid, 0).
+        import socket
+        try:
+            with socket.create_connection(("localhost", 1995), timeout=2):
+                return True
+        except OSError:
+            # PID exists but port not open — stale PID file, clean up
             self.pid_file.unlink(missing_ok=True)
             return False
 
