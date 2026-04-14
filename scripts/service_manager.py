@@ -91,7 +91,18 @@ class ServiceManager:
 
         # Always use .env
         env = os.environ.copy()
-        cmd = ["uv", "run", "python", "src/run.py", "--env-file", ".env"]
+        # Resolve uv absolute path — it may live in ~/.local/bin which is not
+        # always in PATH when the script is invoked non-interactively.
+        import shutil
+        uv_bin = (
+            shutil.which("uv", path=env.get("PATH", ""))
+            or shutil.which("uv", path=os.path.expanduser("~/.local/bin") + ":" + env.get("PATH", ""))
+        )
+        if not uv_bin:
+            raise FileNotFoundError(
+                "uv not found. Add ~/.local/bin to PATH or reinstall uv: curl -LsSf https://astral.sh/uv/install.sh | sh"
+            )
+        cmd = [uv_bin, "run", "python", "src/run.py", "--env-file", ".env"]
 
         if background:
             print("🚀 Starting EverMemOS in background...")
