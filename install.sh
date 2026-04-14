@@ -222,10 +222,12 @@ else
 
     if ! command -v unzip &>/dev/null; then
         echo "  ⚠️  unzip not found, attempting to install..."
+        _SUDO=""
+        command -v sudo &>/dev/null && _SUDO="sudo"
         if command -v apt-get &>/dev/null; then
-            sudo apt-get install -y unzip
+            $_SUDO apt-get install -y unzip
         elif command -v yum &>/dev/null; then
-            sudo yum install -y unzip
+            $_SUDO yum install -y unzip
         elif command -v brew &>/dev/null; then
             brew install unzip
         else

@@ -33,6 +33,8 @@ class SetupManager:
     def __init__(self, project_dir: Optional[str] = None):
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
         self.os_type = platform.system().lower()
+        # Use sudo only when it is available (not present on root-only envs like TEE containers)
+        self._sudo = "sudo " if shutil.which("sudo") else ""
 
     def _read_env_value(self, key: str, default: str = "") -> str:
         """Read a single key from .env file. Returns default if file or key not found."""
@@ -218,19 +220,19 @@ class SetupManager:
 
                 commands = [
                     # Update package index
-                    "sudo apt-get update",
+                    f"{self._sudo}apt-get update",
                     # Install prerequisites
-                    "sudo apt-get install -y ca-certificates curl gnupg",
+                    f"{self._sudo}apt-get install -y ca-certificates curl gnupg",
                     # Add Docker's official GPG key
-                    "sudo install -m 0755 -d /etc/apt/keyrings",
-                    "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
-                    "sudo chmod a+r /etc/apt/keyrings/docker.gpg",
+                    f"{self._sudo}install -m 0755 -d /etc/apt/keyrings",
+                    f"curl -fsSL https://download.docker.com/linux/ubuntu/gpg | {self._sudo}gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
+                    f"{self._sudo}chmod a+r /etc/apt/keyrings/docker.gpg",
                     # Set up repository
-                    'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null',
+                    f'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | {self._sudo}tee /etc/apt/sources.list.d/docker.list > /dev/null',
                     # Update package index again
-                    "sudo apt-get update",
+                    f"{self._sudo}apt-get update",
                     # Install Docker
-                    "sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin",
+                    f"{self._sudo}apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin",
                 ]
 
                 for cmd in commands:
@@ -244,14 +246,14 @@ class SetupManager:
                     )
 
                 # Start Docker service
-                subprocess.run("sudo systemctl start docker", shell=True, check=True)
-                subprocess.run("sudo systemctl enable docker", shell=True, check=True)
+                subprocess.run(f"{self._sudo}systemctl start docker", shell=True, check=True)
+                subprocess.run(f"{self._sudo}systemctl enable docker", shell=True, check=True)
 
                 # Add current user to docker group (optional, requires re-login)
                 try:
                     username = os.environ.get("USER", os.environ.get("USERNAME"))
                     if username:
-                        subprocess.run(f"sudo usermod -aG docker {username}", shell=True, check=True)
+                        subprocess.run(f"{self._sudo}usermod -aG docker {username}", shell=True, check=True)
                         self.print_warning(f"Added {username} to docker group")
                         self.print_warning("You may need to log out and back in for group changes to take effect")
                 except:
@@ -264,11 +266,11 @@ class SetupManager:
                 self.print_info("Installing Docker on RHEL/CentOS/Fedora...")
 
                 commands = [
-                    "sudo yum install -y yum-utils",
-                    "sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo",
-                    "sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin",
-                    "sudo systemctl start docker",
-                    "sudo systemctl enable docker",
+                    f"{self._sudo}yum install -y yum-utils",
+                    f"{self._sudo}yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo",
+                    f"{self._sudo}yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin",
+                    f"{self._sudo}systemctl start docker",
+                    f"{self._sudo}systemctl enable docker",
                 ]
 
                 for cmd in commands:
@@ -386,8 +388,8 @@ class SetupManager:
                 self.print_info("Installing Docker Compose plugin on Debian/Ubuntu...")
 
                 commands = [
-                    "sudo apt-get update",
-                    "sudo apt-get install -y docker-compose-plugin",
+                    f"{self._sudo}apt-get update",
+                    f"{self._sudo}apt-get install -y docker-compose-plugin",
                 ]
 
                 for cmd in commands:
@@ -407,7 +409,7 @@ class SetupManager:
                 self.print_info("Installing Docker Compose plugin on RHEL/CentOS/Fedora...")
 
                 commands = [
-                    "sudo yum install -y docker-compose-plugin",
+                    f"{self._sudo}yum install -y docker-compose-plugin",
                 ]
 
                 for cmd in commands:
