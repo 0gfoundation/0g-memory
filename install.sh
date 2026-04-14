@@ -221,8 +221,17 @@ else
     fi
 
     if ! command -v unzip &>/dev/null; then
-        echo "  ❌ unzip not found. Please install unzip and retry."
-        exit 1
+        echo "  ⚠️  unzip not found, attempting to install..."
+        if command -v apt-get &>/dev/null; then
+            sudo apt-get install -y unzip
+        elif command -v yum &>/dev/null; then
+            sudo yum install -y unzip
+        elif command -v brew &>/dev/null; then
+            brew install unzip
+        else
+            echo "  ❌ Cannot install unzip automatically. Please install it manually and retry."
+            exit 1
+        fi
     fi
 
     unzip -o "$ZGS_KV_ZIP" zgs_kv -d "$ZGS_KV_DIR"
