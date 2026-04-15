@@ -225,11 +225,11 @@ else
         _SUDO=""
         command -v sudo &>/dev/null && _SUDO="sudo"
         if command -v apt-get &>/dev/null; then
-            $_SUDO apt-get install -y unzip
+            $_SUDO apt-get install -y unzip || { echo "  ❌ Failed to install unzip. Please install it manually and retry."; exit 1; }
         elif command -v yum &>/dev/null; then
-            $_SUDO yum install -y unzip
+            $_SUDO yum install -y unzip || { echo "  ❌ Failed to install unzip. Please install it manually and retry."; exit 1; }
         elif command -v brew &>/dev/null; then
-            brew install unzip
+            brew install unzip || { echo "  ❌ Failed to install unzip. Please install it manually and retry."; exit 1; }
         else
             echo "  ❌ Cannot install unzip automatically. Please install it manually and retry."
             exit 1
