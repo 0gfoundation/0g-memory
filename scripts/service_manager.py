@@ -30,43 +30,69 @@ class ServiceManager:
         existing_logs = sorted(logs_dir.glob("evermemos_*.log")) if logs_dir.exists() else []
         self.log_file = existing_logs[-1] if existing_logs else logs_dir / "evermemos.log"
 
+    def _is_process_alive(self, pid: int) -> bool:
+        """Return True if process with given PID exists (alive or zombie)."""
+        try:
+            os.kill(pid, 0)
+            return True
+        except PermissionError:
+            return True  # exists, owned by another user
+        except (ProcessLookupError, ValueError, OSError):
+            return False
+
+    def _is_port_open(self) -> bool:
+        """Return True if port 1995 is accepting TCP connections."""
+        import socket
+        try:
+            with socket.create_connection(("localhost", 1995), timeout=2):
+                return True
+        except OSError:
+            return False
+
     def is_running(self) -> bool:
-        """Check if service is running"""
+        """Return True if the service process is alive (PID file exists + process exists).
+
+        Does NOT check port 1995 — the process is considered 'running' as soon as it
+        is alive, even during the startup window before the API port opens.
+        Use _is_port_open() to check API readiness separately.
+        """
         if not self.pid_file.exists():
             return False
 
         try:
             pid = int(self.pid_file.read_text().strip())
-            # Check if process exists
-            os.kill(pid, 0)
-            return True
-        except PermissionError:
-            # Process exists but owned by another user
-            return True
-        except (ProcessLookupError, ValueError):
-            # Process doesn't exist, clean up stale PID file
+        except ValueError:
             self.pid_file.unlink(missing_ok=True)
             return False
 
+        if self._is_process_alive(pid):
+            return True
+
+        # Process is gone — clean up stale PID file
+        self.pid_file.unlink(missing_ok=True)
+        return False
+
     def get_status(self) -> Dict:
         """Get service status"""
+        process_alive = self.is_running()
         status = {
-            "running": self.is_running(),
+            "running": process_alive,
             "pid": None,
             "api_accessible": False,
             "mode": None
         }
 
-        if status["running"]:
+        if process_alive:
             status["pid"] = int(self.pid_file.read_text().strip())
 
-            # Check API health endpoint
-            try:
-                req = urllib.request.Request("http://localhost:1995/health")
-                with urllib.request.urlopen(req, timeout=2) as response:
-                    status["api_accessible"] = response.status == 200
-            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
-                pass
+            # Check API health endpoint (only bother if port is open)
+            if self._is_port_open():
+                try:
+                    req = urllib.request.Request("http://localhost:1995/health")
+                    with urllib.request.urlopen(req, timeout=2) as response:
+                        status["api_accessible"] = response.status == 200
+                except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
+                    pass
 
         # Check configuration file
         if (self.project_dir / ".env").exists():
@@ -91,7 +117,18 @@ class ServiceManager:
 
         # Always use .env
         env = os.environ.copy()
-        cmd = ["uv", "run", "python", "src/run.py", "--env-file", ".env"]
+        # Resolve uv absolute path — it may live in ~/.local/bin which is not
+        # always in PATH when the script is invoked non-interactively.
+        import shutil
+        uv_bin = (
+            shutil.which("uv", path=env.get("PATH", ""))
+            or shutil.which("uv", path=os.path.expanduser("~/.local/bin") + ":" + env.get("PATH", ""))
+        )
+        if not uv_bin:
+            raise FileNotFoundError(
+                "uv not found. Add ~/.local/bin to PATH or reinstall uv: curl -LsSf https://astral.sh/uv/install.sh | sh"
+            )
+        cmd = [uv_bin, "run", "python", "src/run.py", "--env-file", ".env"]
 
         if background:
             print("🚀 Starting EverMemOS in background...")
@@ -110,24 +147,34 @@ class ServiceManager:
             # Save PID
             self.pid_file.write_text(str(process.pid))
 
-            # Poll until API is accessible or timeout
+            # Poll until API is accessible or timeout.
+            # Crash detection uses process.poll() — reliable because we hold the
+            # Popen object.  Readiness detection uses _is_port_open() + /health,
+            # kept separate so a slow startup never triggers a false "crashed" error.
             print("⏳ Waiting for EverMemOS API to be ready...", end="", flush=True)
             deadline = time.time() + 300
             while time.time() < deadline:
                 time.sleep(1)
                 print(".", end="", flush=True)
-                status = self.get_status()
-                if not status["running"]:
+                # Did the process exit?
+                if process.poll() is not None:
                     print()
                     print("❌ Service exited unexpectedly")
                     print(f"   Check logs: cat {self.log_file}")
                     return False
-                if status["api_accessible"]:
-                    print()
-                    print(f"✅ EverMemOS started successfully (PID: {process.pid})")
-                    print(f"📝 Logs: {self.log_file}")
-                    print(f"🌐 API: http://localhost:1995")
-                    return True
+                # Is the API ready?
+                if self._is_port_open():
+                    try:
+                        req = urllib.request.Request("http://localhost:1995/health")
+                        with urllib.request.urlopen(req, timeout=2) as response:
+                            if response.status == 200:
+                                print()
+                                print(f"✅ EverMemOS started successfully (PID: {process.pid})")
+                                print(f"📝 Logs: {self.log_file}")
+                                print(f"🌐 API: http://localhost:1995")
+                                return True
+                    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
+                        pass
 
             print()
             print("❌ Service did not become accessible within 300s")

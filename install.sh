@@ -221,8 +221,19 @@ else
     fi
 
     if ! command -v unzip &>/dev/null; then
-        echo "  ❌ unzip not found. Please install unzip and retry."
-        exit 1
+        echo "  ⚠️  unzip not found, attempting to install..."
+        _SUDO=""
+        command -v sudo &>/dev/null && _SUDO="sudo"
+        if command -v apt-get &>/dev/null; then
+            $_SUDO apt-get install -y unzip || { echo "  ❌ Failed to install unzip. Please install it manually and retry."; exit 1; }
+        elif command -v yum &>/dev/null; then
+            $_SUDO yum install -y unzip || { echo "  ❌ Failed to install unzip. Please install it manually and retry."; exit 1; }
+        elif command -v brew &>/dev/null; then
+            brew install unzip || { echo "  ❌ Failed to install unzip. Please install it manually and retry."; exit 1; }
+        else
+            echo "  ❌ Cannot install unzip automatically. Please install it manually and retry."
+            exit 1
+        fi
     fi
 
     unzip -o "$ZGS_KV_ZIP" zgs_kv -d "$ZGS_KV_DIR"

@@ -14,6 +14,9 @@
 
 set -e
 
+# ── Ensure ~/.local/bin is in PATH (uv installs there) ───────────────────────
+export PATH="$HOME/.local/bin:$PATH"
+
 # ── Parse arguments ───────────────────────────────────────────────────────────
 RESTART=false
 for arg in "$@"; do
@@ -93,7 +96,10 @@ KV_TS=$(date -u +"%Y%m%d_%H%M%S")
 KV_LOG="$KV_RUN_DIR/kv_${KV_TS}.log"
 KV_STARTED=false
 
-if pgrep -f "zgs_kv" > /dev/null 2>&1; then
+KV_PORT_OPEN=false
+(echo > /dev/tcp/localhost/6789) 2>/dev/null && KV_PORT_OPEN=true || true
+
+if pgrep -f "zgs_kv" > /dev/null 2>&1 && [ "$KV_PORT_OPEN" = true ]; then
     echo "  ✅ kv-server already running, skipping"
 elif [ ! -f "$KV_BIN" ]; then
     echo "  ⚠️  kv-server binary not found at $KV_BIN, skipping"
@@ -183,7 +189,7 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     MONGO_OK=false
     ES_OK=false
 
-    nc -z localhost 27017 2>/dev/null && MONGO_OK=true || true
+    (echo > /dev/tcp/localhost/27017) 2>/dev/null && MONGO_OK=true || true
     # Use ES cluster health API instead of TCP check: port open ≠ ES ready.
     # wait_for_status=yellow ensures all primary shards are allocated before returning.
     # Must check "timed_out":false in the response body — ES always returns HTTP 200
