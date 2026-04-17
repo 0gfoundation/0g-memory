@@ -250,7 +250,7 @@ There are two mechanisms at play:
 
 **Passive storage** — every prompt you submit, every assistant response, and every tool call result is captured and sent to the memory backend. Nothing is lost, and nothing requires action on your part.
 
-**Active retrieval** — at the start of each new session, recent memories are fetched and injected directly into the assistant's context. Mid-session, whenever you reference past events or ask about something discussed before, the assistant searches the memory store and incorporates the results before replying.
+**Active retrieval** — for Claude Code and OpenCode, recent memories are fetched and injected at the start of each new session. For all clients, mid-session semantic search retrieves relevant past context before each reply.
 
 The practical effect: your assistant carries context across sessions the same way a colleague does — it remembers past decisions, ongoing work, and the reasoning behind choices, even after you close and reopen it.
 
@@ -278,9 +278,9 @@ This is the core value: the longer you use your AI coding assistant, the richer 
 
 ### Memory scoping and isolation
 
-**What counts as a "project"**
+**How memory is scoped**
 
-For Claude Code and OpenCode, memory is scoped to the **working directory** you open your assistant in. All sessions started in the same directory share the same memory pool — opening a new session does not give you a blank slate. When you start a new session, recent memories from that directory are automatically injected into your context.
+For Claude Code and OpenCode, memory is scoped to the **working directory** you open your assistant in. All sessions started in the same directory share the same memory pool — opening a new session does not give you a blank slate. Recent memories from that directory are automatically injected when a new session starts.
 
 For OpenClaw, memory is scoped to the **individual session**. Each session starts fresh with no injected history. Memory from previous sessions is not available in new ones.
 
@@ -293,7 +293,7 @@ Claude Code, OpenCode, and OpenClaw each maintain **separate memory namespaces**
 | Situation | What happens |
 |-----------|-------------|
 | You open a new Claude Code / OpenCode session in the same directory | Recent memories from that directory are injected automatically |
-| You want a clean-slate session in Claude Code / OpenCode | Not possible by default — switch to a different directory, or use `EVERMEMOS_GROUP_ID` env var to override the namespace |
+| You want a clean-slate session in Claude Code / OpenCode | Not possible by default — prior memories from the same directory are always injected |
 | You switch from Claude Code to OpenCode on the same project | OpenCode starts with its own memory — it does not see Claude Code's history |
 | You start a new OpenClaw session | No history injected — each session is fully isolated |
 
