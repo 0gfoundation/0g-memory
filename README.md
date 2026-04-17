@@ -276,6 +276,27 @@ The assistant did not guess. It retrieved the exact reasoning you recorded.
 
 This is the core value: the longer you use your AI coding assistant, the richer the memory store becomes, and the less time you spend re-establishing context at the start of each session.
 
+### Memory scoping and isolation
+
+**What counts as a "project"**
+
+For Claude Code and OpenCode, memory is scoped to the **working directory** you open your assistant in. All sessions started in the same directory share the same memory pool — opening a new session does not give you a blank slate. When you start a new session, recent memories from that directory are automatically injected into your context.
+
+For OpenClaw, memory is scoped to the **individual session**. Each session starts fresh with no injected history. Memory from previous sessions is not available in new ones.
+
+**Cross-client isolation**
+
+Claude Code, OpenCode, and OpenClaw each maintain **separate memory namespaces**, even when used in the same project directory. Memories captured by Claude Code are not visible to OpenCode sessions, and vice versa. If you switch between clients, each one only sees what it has stored itself.
+
+**Practical implications**
+
+| Situation | What happens |
+|-----------|-------------|
+| You open a new Claude Code / OpenCode session in the same directory | Recent memories from that directory are injected automatically |
+| You want a clean-slate session in Claude Code / OpenCode | Not possible by default — switch to a different directory, or use `EVERMEMOS_GROUP_ID` env var to override the namespace |
+| You switch from Claude Code to OpenCode on the same project | OpenCode starts with its own memory — it does not see Claude Code's history |
+| You start a new OpenClaw session | No history injected — each session is fully isolated |
+
 ### How memory works during a session
 
 | Moment | Claude Code / OpenCode | OpenClaw |
