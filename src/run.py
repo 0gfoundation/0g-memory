@@ -137,7 +137,7 @@ def main():
 
     # Start service using command line arguments
     try:
-        uvicorn_kwargs = {"host": host, "port": port}
+        uvicorn_kwargs = {"host": host, "port": port, "loop": "asyncio"}
         uvicorn.run(app, **uvicorn_kwargs)
     except KeyboardInterrupt:
         logger.info("👋 %s stopped", APP_NAME)
